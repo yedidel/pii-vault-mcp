@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package bridge;
+
+//stream
+service BridgeService {
+  rpc SendAction (ActionRequest) returns (ActionResponse);
+}
+
+message ActionRequest {
+  int32 agent_id = 1;
+  ActionType action = 2;
+}
+
+message ActionResponse {
+  int32 request_id = 1;
+  StatusType status = 2;
+}
+
+enum ActionType {
+  ACTION_TYPE_UNSPECIFIED = 0;
+  LOGIN = 1;
+  CONFIRM = 2;
+}
+
+enum StatusType {
+  STATUS_TYPE_UNSPECIFIED = 0;
+  DONE = 1;
+  FAIL = 2;
+}
