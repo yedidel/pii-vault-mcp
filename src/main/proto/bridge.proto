@@ -8,23 +8,27 @@ service BridgeService {
 }
 
 message ActionRequest {
-  int32 agent_id = 1;
-  ActionType action = 2;
+  string agent_id = 1;
+  string user_id=2;
+  ActionType action = 3;
+  string target_domain=4;
 }
 
 message ActionResponse {
-  int32 request_id = 1;
+  string request_id = 1;
   StatusType status = 2;
 }
 
 enum ActionType {
   ACTION_TYPE_UNSPECIFIED = 0;
   LOGIN = 1;
-  CONFIRM = 2;
+  PAYMENT=2;
+  CONFIRM = 3;
 }
 
 enum StatusType {
   STATUS_TYPE_UNSPECIFIED = 0;
-  DONE = 1;
-  FAIL = 2;
+  RECEIVED = 1;
+  PENDING=2;
+  REJECTED = 3;
 }

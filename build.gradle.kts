@@ -1,9 +1,12 @@
 import com.google.protobuf.gradle.id
+import org.jlleitschuh.gradle.ktlint.tasks.KtLintCheckTask
+import org.jlleitschuh.gradle.ktlint.tasks.KtLintFormatTask
 
 plugins {
     kotlin("jvm") version "1.9.22"
     application
     id("com.google.protobuf") version "0.9.4"
+    id("org.jlleitschuh.gradle.ktlint") version "12.1.0"
 }
 
 repositories {
@@ -43,11 +46,18 @@ protobuf {
     }
 }
 
-sourceSets {
-    main {
-        kotlin {
-            srcDir("build/generated/source/proto/main/kotlin")
-            srcDir("build/generated/source/proto/main/grpckt")
-        }
+ktlint {
+    filter {
+        exclude("**/build/generated/**")
     }
+}
+tasks.withType<KtLintCheckTask>().configureEach {
+    exclude("**/build/generated/**")
+}
+
+tasks.withType<KtLintFormatTask>().configureEach {
+    exclude("**/build/generated/**")
+}
+tasks.named("ktlintMainSourceSetCheck") {
+    enabled = false
 }
