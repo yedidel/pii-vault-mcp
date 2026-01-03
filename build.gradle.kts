@@ -61,3 +61,6 @@ tasks.withType<KtLintFormatTask>().configureEach {
 tasks.named("ktlintMainSourceSetCheck") {
     enabled = false
 }
+application {
+    mainClass.set("bridge.GrpcServerKt")
+}

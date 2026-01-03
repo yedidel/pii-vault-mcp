@@ -1,0 +1,3 @@
+grpcio # gRPC runtime
+grpcio-tools # protoc compiler for Python
+protobuf # Protocol Buffers
