@@ -1,8 +1,4 @@
 # Bridge Server
-
-A gRPC-based adapter service implemented in Kotlin.  
-The Bridge Server acts as an intermediary layer between external agents and internal system components, exposing a well-defined gRPC interface without embedding business logic.
-
 ---
 
 ## Prerequisites
@@ -22,7 +18,7 @@ git --version
 
 ### Clone the Repository
 
-git clone <BRIDGE_SERVER_REPO_URL>  
+git clone <need change>  
 cd bridge-server
 
 ---
@@ -55,16 +51,3 @@ On successful startup, the following log is printed:
 gRPC server started on port 50051
 
 ---
-
-## Protocol Buffers and gRPC
-
-- `.proto` files are located under `src/main/proto`
-- gRPC source files are generated automatically during the Gradle build phase
-- Generated sources are not committed to the repository
-
----
-
-## Configuration
-
-- Server port and gRPC configuration are defined directly in the Kotlin source code
-- No external configuration files are required for local execution
