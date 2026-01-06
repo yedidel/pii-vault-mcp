@@ -26,3 +26,23 @@ class BridgeClient:
         )
         #call the server method and return its response
         return self.stub.SendAction(request)
+
+    #close the connection to the server
+    def close(self):
+        if self.channel is not None:
+            self.channel.close()
+            #to prevent using closed channel
+            self.channel = None
+            self.stub = None
+
+
+    #context manager methods
+
+    #enter method to open connection
+    def __enter__(self):
+        self.connect()
+        return self
+
+    #exit method to close connection without return value to pass the error as usual for now
+    def __exit__(self,exc_type, exc_value, traceback):
+        self.close()
