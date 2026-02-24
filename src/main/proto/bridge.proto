@@ -2,33 +2,63 @@ syntax = "proto3";
 
 package bridge;
 
-//stream
+// שירות הברידג' המרכזי
 service BridgeService {
+  // הסוכן שולח בקשה ראשונית
   rpc SendAction (ActionRequest) returns (ActionResponse);
+
+  // הסוכן בודק מה מצב הבקשה (Polling מול ה-DB של הברידג')
+  rpc GetActionStatus (StatusRequest) returns (StatusResponse);
 }
 
+// בקשה לביצוע פעולה
 message ActionRequest {
-  string agent_id = 1;
-  string user_id=2;
-  ActionType action = 3;
-  string target_domain=4;
+  string agent_id = 1;         // מזהה הסוכן (לצורך בדיקה מול "השומר")
+  string user_install_id = 2;  // המזהה שהתקבל בהתקנת האפליקציה
+  ActionType action = 3;       // סוג הפעולה (LOGIN, PAYMENT וכו')
+  string action_metadata = 4;  // נתונים נוספים ב-JSON (למשל: סכום לתשלום)
+  string target_domain = 5;    // הדומיין שאליו שייכת הפעולה
 }
 
+// תשובה מיידית מהברידג' לסוכן
 message ActionResponse {
-  string request_id = 1;
-  StatusType status = 2;
+  string request_id = 1;       // ה-UUID שנוצר בברידג'
+  StatusType status = 2;       // סטטוס ראשוני (RECEIVED או FAILED)
+  string message = 3;          // הודעת שגיאה במקרה של תקלה (למשל: "App not installed")
 }
 
+// בקשת בירור סטטוס
+message StatusRequest {
+  string request_id = 1;       // המזהה שקיבלנו ב-ActionResponse
+}
+
+// תשובת הסטטוס המפורטת
+message StatusResponse {
+  StatusType status = 1;       // הסטטוס הנוכחי ב-DB
+  string result_data = 2;      // מידע נוסף אם הפעולה הסתיימה (למשל: טוקן התחברות)
+}
+
+// סוגי הפעולות הנתמכות
 enum ActionType {
   ACTION_TYPE_UNSPECIFIED = 0;
   LOGIN = 1;
-  PAYMENT=2;
+  PAYMENT = 2;
   CONFIRM = 3;
+  SENSITIVE_DATA_ACCESS = 4;
 }
 
+// סטטוסים מפורטים לפי זרימת העבודה (מסמך הגוגל דוקס)
 enum StatusType {
   STATUS_TYPE_UNSPECIFIED = 0;
-  RECEIVED = 1;
-  PENDING=2;
-  REJECTED = 3;
+  RECEIVED = 1;                 // הבקשה התקבלה בברידג' ונרשמה בקפקא
+  AUTHORIZED = 2;               // "השומר" אישר את הפעולה
+  PENDING_VAULT_DELIVERY = 3;   // מנסים לשלוח את הבקשה לכספת
+  WAITING_FOR_USER = 4;         // הבקשה הגיעה לכספת ומחכה לאישור משתמש
+  IN_PROGRESS = 5;              // המשתמש אישר והפעולה בביצוע
+  COMPLETED_SUCCESS = 6;        // הצלחה סופית
+  COMPLETED_FAILED = 7;         // כישלון טכני בביצוע
+  DECLINED_BY_USER = 8;         // המשתמש דחה את הבקשה בכספת
+  EXPIRED = 9;                  // עבר זמן ה-Timeout
+  FAILED_APP_NOT_INSTALLED = 10; // המשתמש לא רשום ב-Directory
+  UNAUTHORIZED_AGENT = 11;       // "השומר" חסם את הסוכן
 }
