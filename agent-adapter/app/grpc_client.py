@@ -2,18 +2,16 @@ import grpc
 import bridge_pb2
 import bridge_pb2_grpc
 
-#simple check
 def send_action():
-    #insecure_channel - jast for now local
     channel = grpc.insecure_channel("localhost:50051")
     stub = bridge_pb2_grpc.BridgeServiceStub(channel)
-    # חפשי את השורה הזו ושני את user_id ל-user_install_id
+
     request = bridge_pb2.ActionRequest(
         agent_id="some_agent",
-        user_install_id="some_user_id",  # <--- זה השינוי!
-        action=bridge_pb2.LOGIN,
-        target_domain="example.com"
+        user_id="some_user_id",
+        action_metadata="test payment metadata"
     )
+
     response = stub.SendAction(request)
 
     print("Response:")
@@ -23,4 +21,3 @@ def send_action():
 
 if __name__ == "__main__":
     send_action()
-
