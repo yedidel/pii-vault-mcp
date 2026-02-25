@@ -1,23 +1,29 @@
 package bridge
-import bridge.Bridge.ActionRequest
-import bridge.Bridge.ActionResponse
-import bridge.Bridge.StatusType
+
+import bridge.model.ActionEntity
+import bridge.repository.ActionRepository
 import java.util.UUID
 
-/**
- * gRPC service implementation for the Bridge component.
- */
-class BridgeServiceImpl : BridgeServiceGrpcKt.BridgeServiceCoroutineImplBase() {
-    // suspend function – can wait for long operations without blocking a thread
-    override suspend fun sendAction(request: Bridge.ActionRequest): ActionResponse {
-        println(
-            "Received ${request.action} request from agent ${request.agentId} " +
-                "for target ${request.targetDomain}",
+// הזרקת ה-Repository דרך הקונסטרקטור
+class BridgeServiceImpl(private val actionRepository: ActionRepository) : BridgeServiceGrpcKt.BridgeServiceCoroutineImplBase() {
+
+    override suspend fun sendAction(request: Bridge.ActionRequest): Bridge.ActionResponse {
+        val requestId = UUID.randomUUID().toString()
+
+        // יצירת האובייקט ושמירה בבסיס הנתונים
+        val entity = ActionEntity(
+            requestId = requestId,
+            agentId = request.agentId,
+            userInstallId = request.userInstallId, // הנתון החדש מהפייתון!
+            targetDomain = request.targetDomain,
+            status = "RECEIVED"
         )
 
-        return ActionResponse.newBuilder()
-            .setRequestId(UUID.randomUUID().toString())
-            .setStatus(StatusType.RECEIVED)
-            .build()
+        actionRepository.save(entity) // השמירה בפועל ב-PostgreSQL
+
+        return actionResponse {
+            this.requestId = requestId
+            this.status = Bridge.StatusType.RECEIVED
+        }
     }
 }

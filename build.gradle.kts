@@ -4,6 +4,13 @@ import org.jlleitschuh.gradle.ktlint.tasks.KtLintFormatTask
 
 plugins {
     kotlin("jvm") version "1.9.22"
+    kotlin("plugin.jpa") version "1.9.22"
+    kotlin("plugin.spring") version "1.9.22"
+
+    // הוספתי את אלה - הם קריטיים כדי ש-JPA יעבוד!
+    id("org.springframework.boot") version "3.2.2"
+    id("io.spring.dependency-management") version "1.1.4"
+
     application
     id("com.google.protobuf") version "0.9.4"
     id("org.jlleitschuh.gradle.ktlint") version "12.1.0"
@@ -19,6 +26,9 @@ dependencies {
     implementation("io.grpc:grpc-stub:1.62.2")
     implementation("io.grpc:grpc-kotlin-stub:1.4.1")
     implementation("com.google.protobuf:protobuf-kotlin:3.25.1")
+    implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+    implementation("org.postgresql:postgresql")
+    implementation("org.jetbrains.kotlin:kotlin-reflect")
 }
 
 protobuf {
