@@ -44,8 +44,27 @@ bin/
 ### Mac OS ###
 .DS_Store
 
-.env
-
-# Python cache
+### Python ###
+.venv/
+venv/
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.Python
+env/
+pip-wheel-metadata/
+*.egg-info/
+dist/
+build/
+
+### Python IDE ###
+.idea/
+.vscode/
+
+### macOS Python cache ###
+.DS_Store
+
+# gRPC generated files (Python)
+bridge_pb2.py
+bridge_pb2_grpc.py

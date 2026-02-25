@@ -1,34 +1,40 @@
 syntax = "proto3";
-
 package bridge;
 
-//stream
 service BridgeService {
   rpc SendAction (ActionRequest) returns (ActionResponse);
+  rpc GetActionStatus (StatusRequest) returns (StatusResponse);
 }
-
 message ActionRequest {
   string agent_id = 1;
-  string user_id=2;
-  ActionType action = 3;
-  string target_domain=4;
+  string user_id = 2;
+  string action_metadata = 3; //additional info about the action
 }
-
+//answer to the initial request, with the generated UUID and initial status
 message ActionResponse {
   string request_id = 1;
   StatusType status = 2;
+  string message = 3;
 }
-
-enum ActionType {
-  ACTION_TYPE_UNSPECIFIED = 0;
-  LOGIN = 1;
-  PAYMENT=2;
-  CONFIRM = 3;
+//request to check the status of a specific action
+message StatusRequest {
+  string request_id = 1;
 }
-
+//response with the current status of the action and any relevant data
+message StatusResponse {
+  string request_id = 1;
+  StatusType status = 2;
+  string result_data = 3;
+}
 enum StatusType {
   STATUS_TYPE_UNSPECIFIED = 0;
   RECEIVED = 1;
-  PENDING=2;
-  REJECTED = 3;
+  WAITING_FOR_USER = 2;
+  IN_PROGRESS = 3;
+  SUCCESS = 4;
+  FAILED = 5;
+  DECLINED_BY_USER = 6;
+  EXPIRED = 7;
+  FAILED_APP_NOT_INSTALLED = 8;
+  UNAUTHORIZED_AGENT = 9;
 }
