@@ -1,5 +1,6 @@
 syntax = "proto3";
 package bridge;
+import "google/protobuf/timestamp.proto";
 
 service BridgeService {
   rpc SendAction (ActionRequest) returns (ActionResponse);
@@ -7,14 +8,15 @@ service BridgeService {
 }
 message ActionRequest {
   string agent_id = 1;
-  string user_id = 2;
-  string action_metadata = 3; //additional info about the action
+  string user_install_id = 2; //id that of app on specific device, used to send push notifications to the user
+  string action_type = 3;
+  map<string, string> parameters = 4;
 }
 //answer to the initial request, with the generated UUID and initial status
 message ActionResponse {
   string request_id = 1;
   StatusType status = 2;
-  string message = 3;
+  string description = 3;
 }
 //request to check the status of a specific action
 message StatusRequest {
@@ -25,16 +27,16 @@ message StatusResponse {
   string request_id = 1;
   StatusType status = 2;
   string result_data = 3;
+  google.protobuf.Timestamp updated_at = 4; //to indicate when the status was last updated, useful for clients to know if they should check again later
 }
 enum StatusType {
   STATUS_TYPE_UNSPECIFIED = 0;
   RECEIVED = 1;
   WAITING_FOR_USER = 2;
   IN_PROGRESS = 3;
-  SUCCESS = 4;
+  COMPLETED = 4;
   FAILED = 5;
-  DECLINED_BY_USER = 6;
+  REJECTED = 6;
   EXPIRED = 7;
   FAILED_APP_NOT_INSTALLED = 8;
-  UNAUTHORIZED_AGENT = 9;
 }
