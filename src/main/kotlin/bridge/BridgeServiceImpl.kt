@@ -2,18 +2,18 @@ package bridge
 import bridge.Bridge.StatusResponse
 import bridge.Bridge.ActionResponse
 import bridge.Bridge.StatusType
+import bridge.repository.ActionRepository
 import java.util.UUID
 import io.grpc.Status
 
 /**
  * gRPC service implementation for the Bridge component.
  */
-class BridgeServiceImpl : BridgeServiceGrpcKt.BridgeServiceCoroutineImplBase() {
+class BridgeServiceImpl(private val actionRepository: ActionRepository) : BridgeServiceGrpcKt.BridgeServiceCoroutineImplBase() {
     // suspend function – can wait for long operations without blocking a thread
     override suspend fun sendAction(request: Bridge.ActionRequest): ActionResponse {
         println(
             "Received ${request.actionType} request from agent ${request.agentId} ")
-        //
         if (!isAgentAuthorized(request.agentId)) {
             throw Status.UNAUTHENTICATED
                 .withDescription("Agent not authorized")
