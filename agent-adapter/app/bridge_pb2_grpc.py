@@ -26,8 +26,7 @@ if _version_not_supported:
 
 
 class BridgeServiceStub(object):
-    """stream
-    """
+    """Missing associated documentation comment in .proto file."""
 
     def __init__(self, channel):
         """Constructor.
@@ -40,13 +39,23 @@ class BridgeServiceStub(object):
                 request_serializer=bridge__pb2.ActionRequest.SerializeToString,
                 response_deserializer=bridge__pb2.ActionResponse.FromString,
                 _registered_method=True)
+        self.GetActionStatus = channel.unary_unary(
+                '/bridge.BridgeService/GetActionStatus',
+                request_serializer=bridge__pb2.StatusRequest.SerializeToString,
+                response_deserializer=bridge__pb2.StatusResponse.FromString,
+                _registered_method=True)
 
 
 class BridgeServiceServicer(object):
-    """stream
-    """
+    """Missing associated documentation comment in .proto file."""
 
     def SendAction(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetActionStatus(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -60,6 +69,11 @@ def add_BridgeServiceServicer_to_server(servicer, server):
                     request_deserializer=bridge__pb2.ActionRequest.FromString,
                     response_serializer=bridge__pb2.ActionResponse.SerializeToString,
             ),
+            'GetActionStatus': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetActionStatus,
+                    request_deserializer=bridge__pb2.StatusRequest.FromString,
+                    response_serializer=bridge__pb2.StatusResponse.SerializeToString,
+            ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
             'bridge.BridgeService', rpc_method_handlers)
@@ -69,8 +83,7 @@ def add_BridgeServiceServicer_to_server(servicer, server):
 
  # This class is part of an EXPERIMENTAL API.
 class BridgeService(object):
-    """stream
-    """
+    """Missing associated documentation comment in .proto file."""
 
     @staticmethod
     def SendAction(request,
@@ -89,6 +102,33 @@ class BridgeService(object):
             '/bridge.BridgeService/SendAction',
             bridge__pb2.ActionRequest.SerializeToString,
             bridge__pb2.ActionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetActionStatus(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/bridge.BridgeService/GetActionStatus',
+            bridge__pb2.StatusRequest.SerializeToString,
+            bridge__pb2.StatusResponse.FromString,
             options,
             channel_credentials,
             insecure,
