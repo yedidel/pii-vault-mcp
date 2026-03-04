@@ -12,10 +12,11 @@ class BridgeServerApplication
 fun main(args: Array<String>) {
     val context = runApplication<BridgeServerApplication>(*args)
     val actionRepository = context.getBean(ActionRepository::class.java)
+    val actionProducer = context.getBean(ActionProducer::class.java)
 
     val server = ServerBuilder
         .forPort(50051)
-        .addService(BridgeServiceImpl(actionRepository)) // עכשיו אנחנו מעבירים לו את ה-Bean
+        .addService(BridgeServiceImpl(actionRepository,actionProducer)) // עכשיו אנחנו מעבירים לו את ה-Bean
         .build()
 
     server.start()
