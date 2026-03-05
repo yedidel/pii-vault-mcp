@@ -40,9 +40,16 @@ class BridgeServiceImpl(
      * return the status of request by the agent pool
      */
     override suspend fun getActionStatus(request: Bridge.StatusRequest): Bridge.StatusResponse  {
+        val optional=actionRepository.findById(request.requestId);
+        if(optional.isEmpty){
+            throw Status.NOT_FOUND.asException()
+        }
+        //jpa return wraper optinal that return val or no to avoid from sitation that use in null object
+        //here we extrct the object
+        val action=optional.get();
         return StatusResponse.newBuilder()
-            .setRequestId(request.requestId)
-            .setStatus(StatusType.RECEIVED).build()
+            .setRequestId(action.requestId)
+            .setStatus(action.status).build()
     }
 
     private fun isAgentAuthorized(agentId: String): Boolean {
