@@ -42,7 +42,7 @@ protobuf {
         id("grpc") {
             artifact = "io.grpc:protoc-gen-grpc-java:1.62.2"
         }
-        id("grpckt") {
+        id("grpckotlin") {
             artifact = "io.grpc:protoc-gen-grpc-kotlin:1.4.1:jdk8@jar"
         }
     }
@@ -53,7 +53,7 @@ protobuf {
             }
             it.plugins {
                 id("grpc")
-                id("grpckt")
+                id("grpckotlin")
             }
         }
     }
