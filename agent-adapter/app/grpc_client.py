@@ -2,7 +2,8 @@ import grpc
 import bridge_pb2
 import bridge_pb2_grpc
 
-
+#Mock Agent gRPC client.
+# Builds a Protobuf ActionRequest and sends it to the Bridge server via gRPC.
 def send_action():
     channel = grpc.insecure_channel("localhost:50051")
     stub = bridge_pb2_grpc.BridgeServiceStub(channel)
