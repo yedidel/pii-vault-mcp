@@ -21,7 +21,7 @@ def send_action(action_request: ActionRequestModel):
     try:
         response = stub.SendAction(proto_request)
     except grpc.RpcError as e:
-        raise Exception(f"gRPC error: {e.details()}")
+        raise Exception(f"gRPC error: ",e)
 
     return {
         "requestId": response.request_id,
