@@ -1,3 +1,5 @@
 grpcio # gRPC runtime
 grpcio-tools # protoc compiler for Python
 protobuf # Protocol Buffers
+fastapi # FastAPI framework for building APIs for the agent adapter
+uvicorn # http server for running the FastAPI application

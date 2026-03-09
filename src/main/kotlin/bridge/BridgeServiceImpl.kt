@@ -1,50 +1,34 @@
 package bridge
-
-import bridge.model.ActionEntity
-import bridge.repository.ActionRepository
-import java.util.UUID
+import bridge.Bridge.ActionResponse
+import bridge.Bridge.StatusResponse
 import org.springframework.stereotype.Service
-
+/**
+ * gRPC server implementation for the Bridge service.
+ * Responsible for receiving requests from agents and delegating them to ActionService.
+ */
 @Service
 class BridgeServiceImpl(
-    private val actionRepository: ActionRepository,
-    private val actionProducer: ActionProducer
+    private val actionService: ActionService
 ) : BridgeServiceGrpcKt.BridgeServiceCoroutineImplBase() {
-
-    override suspend fun sendAction(request: Bridge.ActionRequest): Bridge.ActionResponse {
-        // יצירת מזהה ייחודי לבקשה
-        val requestId = UUID.randomUUID().toString()
-
-        try {
-            // 1. שמירה בבסיס הנתונים (PostgreSQL)
-            val entity = ActionEntity(
-                requestId = requestId,
-                agentId = request.agentId,
-                userInstallId = request.userInstallId,
-                targetDomain = request.targetDomain,
-                status = "RECEIVED"
-            )
-            actionRepository.save(entity)
-            println("✅ DB: Action saved for Agent ${request.userInstallId}")
-
-            // 2. שליחה למערכת הכריזה (Kafka)
-            // שולחים את המזהה ואת הדומיין אליו הסוכן פנה
-            actionProducer.sendActionToKafka(request.userInstallId, request.targetDomain)
-
-            // 3. החזרת תשובה חיובית לסוכן
-            return Bridge.ActionResponse.newBuilder()
-                .setRequestId(requestId)
-                .setStatus(Bridge.StatusType.RECEIVED)
-                .build()
-
-        } catch (e: Exception) {
-            // טיפול בשגיאות - הדפסה למסך והחזרת תשובה בסיסית כדי לא לשבור את הסוכן
-            println("❌ Error in BridgeService: ${e.message}")
-
-            return Bridge.ActionResponse.newBuilder()
-                .setRequestId(requestId)
-                .setStatus(Bridge.StatusType.RECEIVED)
-                .build()
-        }
+    // suspend function – can wait for long operations without blocking a thread
+    /**
+     * Receives an action request from the agent and forwards it to ActionService
+     * for validation and processing.
+     */
+    override suspend fun sendAction(request: Bridge.ActionRequest): ActionResponse {
+        println(
+            "Received ${request.actionType} request from agent ${request.agentId} ",
+        )
+        return actionService.handleAction(request);
     }
+    /**
+     * Returns the current status of a request based on its requestId.
+     */
+    override suspend fun getActionStatus(request: Bridge.StatusRequest): Bridge.StatusResponse  {
+        val action=actionService.getActionById(request.requestId);
+        return StatusResponse.newBuilder()
+            .setRequestId(action.requestId)
+            .setStatus(action.status).build()
+    }
+
 }

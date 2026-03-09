@@ -6,8 +6,7 @@ plugins {
     kotlin("jvm") version "1.9.22"
     kotlin("plugin.jpa") version "1.9.22"
     kotlin("plugin.spring") version "1.9.22"
-
-    // הוספתי את אלה - הם קריטיים כדי ש-JPA יעבוד!
+    // for spring server build
     id("org.springframework.boot") version "3.2.2"
     id("io.spring.dependency-management") version "1.1.4"
 
@@ -26,10 +25,13 @@ dependencies {
     implementation("io.grpc:grpc-stub:1.62.2")
     implementation("io.grpc:grpc-kotlin-stub:1.4.1")
     implementation("com.google.protobuf:protobuf-kotlin:3.25.1")
+    // for spring server and postgresql
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.postgresql:postgresql")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
-    implementation("org.springframework.kafka:spring-kafka")
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
+    implementation("com.fasterxml.jackson.core:jackson-databind")
+    implementation("org.springframework.boot:spring-boot-starter-web")
 }
 
 protobuf {
@@ -40,7 +42,7 @@ protobuf {
         id("grpc") {
             artifact = "io.grpc:protoc-gen-grpc-java:1.62.2"
         }
-        id("grpckt") {
+        id("grpckotlin") {
             artifact = "io.grpc:protoc-gen-grpc-kotlin:1.4.1:jdk8@jar"
         }
     }
@@ -51,7 +53,7 @@ protobuf {
             }
             it.plugins {
                 id("grpc")
-                id("grpckt")
+                id("grpckotlin")
             }
         }
     }
@@ -59,7 +61,7 @@ protobuf {
 
 ktlint {
     filter {
-        exclude("**/build/generated/**")
+        exclude("**/build/**")
     }
 }
 tasks.withType<KtLintCheckTask>().configureEach {

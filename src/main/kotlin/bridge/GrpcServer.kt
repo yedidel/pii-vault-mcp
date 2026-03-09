@@ -1,23 +1,22 @@
 package bridge
-
-import bridge.repository.ActionRepository
+import io.grpc.ServerBuilder
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
-import org.springframework.context.ConfigurableApplicationContext
-import io.grpc.ServerBuilder
 
 @SpringBootApplication
 class BridgeServerApplication
 
-fun main(args: Array<String>) {
-    val context = runApplication<BridgeServerApplication>(*args)
-    val actionRepository = context.getBean(ActionRepository::class.java)
-    val actionProducer = context.getBean(ActionProducer::class.java)
-
-    val server = ServerBuilder
-        .forPort(50051)
-        .addService(BridgeServiceImpl(actionRepository,actionProducer)) // עכשיו אנחנו מעבירים לו את ה-Bean
-        .build()
+fun main() {
+    // Starts Spring Boot and initializes DB connection to PostgreSQL (Docker)
+    // context contains all Spring beans, including DB connection and repositories
+    val context = runApplication<BridgeServerApplication>()
+    // Get the BridgeServiceImpl bean created and managed by Spring
+    val bridgeService = context.getBean(BridgeServiceImpl::class.java)
+    val server =
+        ServerBuilder
+            .forPort(50051)
+            .addService(bridgeService)
+            .build()
 
     server.start()
     println("gRPC server started on port 50051")
