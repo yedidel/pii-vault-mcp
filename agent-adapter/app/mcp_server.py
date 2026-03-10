@@ -20,27 +20,34 @@ def send_action(agentId: str, userInstallId: str,actionType:str ,parameters:dict
     TRANSACTION
     FILL_FORM
     """
-    response= main.send_action(ActionRequestModel(
-        agentId=agentId,
-        userInstallId=userInstallId,
-        actionType=actionType,
-        parameters=parameters
-    ))
-    return {
-        "requestId": response["requestId"],
-        "status": response["status"],
-        "description": response["description"]
-    }
+    try:
+        response= main.send_action(ActionRequestModel(
+            agentId=agentId,
+            userInstallId=userInstallId,
+            actionType=actionType,
+            parameters=parameters
+        ))
+        return {
+            "requestId": response["requestId"],
+            "status": response["status"],
+            "description": response["description"]
+        }
+    except Exception as e:
+        return {"error": str(e)}
 
 @mcp.tool(
     description="Get the status of a previously sent action request to the Bridge system"
 )
 def get_action_status(requestId: str):
-    response= main.get_status(requestId)
-    return {
-        "requestId": response["requestId"],
-        "status": response["status"],
-        "resultData": response["resultData"]
-    }
+    try:
+        response= main.get_status(requestId)
+        return {
+            "requestId": response["requestId"],
+            "status": response["status"],
+            "resultData": response["resultData"]
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
 if __name__ == "__main__":
-    mcp.run()
+    mcp.run(transport="stdio")
