@@ -17,9 +17,4 @@ async def send_action(action:models.ActionRequestModel):
 
 @app.get("/status/{request_id}")
 async def getStatus(request_id: str):
-    response= main.get_status(request_id)
-    return {
-        "requestId": response.request_id,
-        "status": response.status,
-        "resultData": response.result_data
-    }
+    return main.get_status(request_id)
