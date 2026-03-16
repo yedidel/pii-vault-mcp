@@ -18,4 +18,3 @@ async def send_action(action:models.ActionRequestModel):
 @app.get("/status/{request_id}")
 async def getStatus(request_id: str):
     return main.get_status(request_id)
-
