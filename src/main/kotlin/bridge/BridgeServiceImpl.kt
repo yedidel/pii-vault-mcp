@@ -5,35 +5,38 @@ import bridge.Bridge.StatusResponse
 import org.springframework.stereotype.Service
 
 /**
- * gRPC server for the Bridge service.
- * Handles request delegation to Database (ActionService) and Kafka (ActionProducer).
+ * gRPC server implementation for the Bridge service.
+ * Responsible for receiving requests from agents and delegating them to ActionService.
  */
 @Service
 class BridgeServiceImpl(
     private val actionService: ActionService,
+    // Injecting the ActionProducer for Kafka messaging
     private val actionProducer: ActionProducer
 ) : BridgeServiceGrpcKt.BridgeServiceCoroutineImplBase() {
 
     /**
-     * Receives and processes an agent action.
-     * Persists to Postgres and broadcasts via Kafka.
+     * Receives an action request from the agent and forwards it to ActionService
+     * for validation and processing.
      */
     override suspend fun sendAction(request: Bridge.ActionRequest): ActionResponse {
-        println("Processing ${request.actionType} for agent: ${request.agentId}")
+        println(
+            "Received ${request.actionType} request from agent ${request.agentId} ",
+        )
 
-        // 1. Database persistence
+        // Persist action to database as before
         val response = actionService.handleAction(request)
 
-        // 2. Kafka event streaming
+        // Send the action request to Kafka topic
         actionProducer.sendActionToKafka(request)
 
         return response
     }
 
     /**
-     * Fetches the current action status from the database by Request ID.
+     * Returns the current status of a request based on its requestId.
      */
-    override suspend fun getActionStatus(request: Bridge.StatusRequest): StatusResponse {
+    override suspend fun getActionStatus(request: Bridge.StatusRequest): Bridge.StatusResponse {
         val action = actionService.getActionById(request.requestId)
 
         return StatusResponse.newBuilder()
