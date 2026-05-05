@@ -4,6 +4,7 @@ import org.springframework.web.socket.config.annotation.EnableWebSocket
 import org.springframework.web.socket.config.annotation.WebSocketConfigurer
 import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 import bridge.websocket.VaultWebSocketHandler
+
 @Configuration
 @EnableWebSocket
 class WebSocketConfig(private val vaultHandler: VaultWebSocketHandler) : WebSocketConfigurer {
