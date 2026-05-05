@@ -86,14 +86,25 @@ class ActionService(
      */
     private fun processAction(request: ActionRequest): ActionResponse {
         val requestId = UUID.randomUUID().toString()
+        //data of the action
         val parametersJson = objectMapper.writeValueAsString(request.parametersMap)
+        //snapshot of the process in case of fail
+        val contextJson = objectMapper.writeValueAsString(
+            mapOf(
+                "agentId" to request.agentId,
+                "actionType" to request.actionType.uppercase(),
+                "parameters" to request.parametersMap,
+                "status" to StatusType.WAITING_FOR_USER.name
+            )
+        )
         val newEntity = ActionEntity(
             requestId = requestId,
             agentId = request.agentId,
             userInstallId = request.userInstallId,
             actionType = request.actionType.uppercase(),
             parametersJson = parametersJson,
-            status = StatusType.RECEIVED,
+            contextJson = contextJson,
+            status = StatusType.WAITING_FOR_USER,
             resultData = null
         )
         val savedEntity = actionRepository.save(newEntity)
@@ -138,6 +149,37 @@ class ActionService(
         //jpa return wraper optinal that return val or no to avoid from sitation that use in null object
         //here we extrct the object
         return optional.get();
+
+    }
+
+    //Update request status after external event To do: update to get information from user
+    fun updateStatus(requestId: String, newStatus: StatusType): ActionEntity {
+        val action = getActionById(requestId)
+        action.status = newStatus
+        if (newStatus == StatusType.IN_PROGRESS) {
+            resumeProcess(action)
+        }
+        //to do : handle with another status
+        return actionRepository.save(action)
+    }
+
+    // Continues the request process after user approval using the saved context
+    private fun resumeProcess(action: ActionEntity) {
+        println("Resuming process for requestId=${action.requestId}")
+        val context = objectMapper.readValue(
+            action.contextJson,
+            Map::class.java
+        )
+        val parameters = context["parameters"] as Map<*, *>
+        val amount = parameters["amount"]
+        val currency = parameters["currency"]
+
+        println("Processing payment: amount=$amount currency=$currency")
+
+        if (context == null) {
+            println("No context found")
+            return
+        }
 
     }
 }
