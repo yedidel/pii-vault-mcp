@@ -28,7 +28,10 @@ class BridgeServiceImpl(
         val response = actionService.handleAction(request)
 
         // Send the action request to Kafka topic
-        actionProducer.sendActionToKafka(request)
+        actionProducer.sendActionToKafka(
+            requestId = response.requestId,
+            request = request
+        )
 
         return response
     }

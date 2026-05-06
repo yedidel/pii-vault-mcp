@@ -14,11 +14,12 @@ class ActionProducer(
      * Sends a detailed JSON message to the Kafka 'agent-actions' topic.
      * Includes all metadata and parameters received from the gRPC request.
      */
-    fun sendActionToKafka(request: Bridge.ActionRequest) {
+    fun sendActionToKafka(requestId: String, request: Bridge.ActionRequest) {
         val topic = "agent-actions"
 
         // 1. Create a structured Map with all the data you want to send
         val messagePayload = mapOf(
+            "requestId" to requestId,
             "timestamp" to System.currentTimeMillis(),
             "agentId" to request.agentId,
             "userInstallId" to request.userInstallId,

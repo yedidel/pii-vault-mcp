@@ -94,7 +94,7 @@ class ActionService(
                 "agentId" to request.agentId,
                 "actionType" to request.actionType.uppercase(),
                 "parameters" to request.parametersMap,
-                "status" to StatusType.WAITING_FOR_USER.name
+                "status" to StatusType.RECEIVED.name
             )
         )
         val newEntity = ActionEntity(
@@ -104,15 +104,11 @@ class ActionService(
             actionType = request.actionType.uppercase(),
             parametersJson = parametersJson,
             contextJson = contextJson,
-            status = StatusType.WAITING_FOR_USER,
+            status = StatusType.RECEIVED,
             resultData = null
         )
         val savedEntity = actionRepository.save(newEntity)
 
-        updateStatus(
-            savedEntity.requestId,
-            StatusType.IN_PROGRESS
-        )
         //to do - saved to Kafka
         return ActionResponse.newBuilder()
             .setRequestId(savedEntity.requestId)
