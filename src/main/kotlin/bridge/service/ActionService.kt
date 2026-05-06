@@ -108,6 +108,11 @@ class ActionService(
             resultData = null
         )
         val savedEntity = actionRepository.save(newEntity)
+
+        updateStatus(
+            savedEntity.requestId,
+            StatusType.IN_PROGRESS
+        )
         //to do - saved to Kafka
         return ActionResponse.newBuilder()
             .setRequestId(savedEntity.requestId)
