@@ -160,12 +160,14 @@ class ActionService(
     //Update request status after external event To do: update to get information from user
     fun updateStatus(requestId: String, newStatus: StatusType): ActionEntity {
         val action = getActionById(requestId)
+
         action.status = newStatus
+        actionRepository.save(action)
+
         if (newStatus == StatusType.IN_PROGRESS) {
             resumeProcess(action)
         }
-        //to do : handle with another status
-        return actionRepository.save(action)
+        return action
     }
 
     // Continues the request process after user approval using the saved context
@@ -175,15 +177,27 @@ class ActionService(
             action.contextJson,
             Map::class.java
         )
-        val parameters = context["parameters"] as Map<*, *>
-        val amount = parameters["amount"]
-        val currency = parameters["currency"]
+        val actionType = context["actionType"] as String
+        when (actionType) {
+            "PAYMENT" -> {
+                val parameters = context["parameters"] as Map<*, *>
+                val amount = parameters["amount"]
+                val currency = parameters["currency"]
 
-        println("Processing payment: amount=$amount currency=$currency")
+                println("Processing payment: amount=$amount currency=$currency")
 
-        if (context == null) {
-            println("No context found")
-            return
+                action.status = StatusType.COMPLETED
+                actionRepository.save(action)
+                println("Request completed")
+            }
+
+            "TRANSACTION" -> {
+                println("Processing transaction")
+            }
+
+            "FILL_FORM" -> {
+                println("Processing form filling")
+            }
         }
 
     }
