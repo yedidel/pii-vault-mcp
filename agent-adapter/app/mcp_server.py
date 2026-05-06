@@ -1,6 +1,7 @@
 from mcp.server.fastmcp import FastMCP
 import main
 from models import ActionRequestModel
+import time
 
 mcp=FastMCP("bridge-adapter")
 
@@ -38,16 +39,40 @@ def send_action(agentId: str, userInstallId: str,actionType:str ,parameters:dict
 @mcp.tool(
     description="Get the status of a previously sent action request to the Bridge system"
 )
+
+
 def get_action_status(requestId: str):
+
     try:
-        response= main.get_status(requestId)
+
+        for _ in range(20):
+
+            response = main.get_status(requestId)
+
+            current_status = response["status"]
+
+            if current_status not in [
+                "RECEIVED",
+                "IN_PROGRESS"
+            ]:
+
+                return {
+                    "requestId": response["requestId"],
+                    "status": current_status,
+                    "resultData": response["resultData"]
+                }
+
+            time.sleep(1)
+
         return {
             "requestId": response["requestId"],
-            "status": response["status"],
-            "resultData": response["resultData"]
+            "status": current_status,
+            "message": "Workflow still running"
         }
+
     except Exception as e:
         return {"error": str(e)}
+
 
 if __name__ == "__main__":
     mcp.run(transport="stdio")

@@ -160,41 +160,8 @@ class ActionService(
         action.status = newStatus
         actionRepository.save(action)
 
-        if (newStatus == StatusType.IN_PROGRESS) {
-            resumeProcess(action)
-        }
+
         return action
     }
 
-    // Continues the request process after user approval using the saved context
-    private fun resumeProcess(action: ActionEntity) {
-        println("Resuming process for requestId=${action.requestId}")
-        val context = objectMapper.readValue(
-            action.contextJson,
-            Map::class.java
-        )
-        val actionType = context["actionType"] as String
-        when (actionType) {
-            "PAYMENT" -> {
-                val parameters = context["parameters"] as Map<*, *>
-                val amount = parameters["amount"]
-                val currency = parameters["currency"]
-
-                println("Processing payment: amount=$amount currency=$currency")
-
-                action.status = StatusType.COMPLETED
-                actionRepository.save(action)
-                println("Request completed")
-            }
-
-            "TRANSACTION" -> {
-                println("Processing transaction")
-            }
-
-            "FILL_FORM" -> {
-                println("Processing form filling")
-            }
-        }
-
-    }
 }
