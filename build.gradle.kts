@@ -2,6 +2,7 @@ import com.google.protobuf.gradle.id
 import org.jlleitschuh.gradle.ktlint.tasks.KtLintCheckTask
 import org.jlleitschuh.gradle.ktlint.tasks.KtLintFormatTask
 
+
 plugins {
     kotlin("jvm") version "1.9.22"
     kotlin("plugin.jpa") version "1.9.22"
@@ -14,6 +15,7 @@ plugins {
     id("com.google.protobuf") version "0.9.4"
     id("org.jlleitschuh.gradle.ktlint") version "12.1.0"
 }
+
 
 repositories {
     mavenCentral()
@@ -34,7 +36,13 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.kafka:spring-kafka")
     implementation("org.springframework.boot:spring-boot-starter-websocket")
+    implementation("org.springframework.boot:spring-boot-starter-webflux")
+    implementation("io.projectreactor:reactor-core")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+
 }
+
+
 
 protobuf {
     protoc {
