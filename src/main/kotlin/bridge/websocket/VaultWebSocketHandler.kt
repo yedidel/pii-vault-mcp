@@ -6,6 +6,7 @@ import org.springframework.web.socket.TextMessage
 import org.springframework.web.socket.WebSocketSession
 import org.springframework.web.socket.handler.TextWebSocketHandler
 import java.util.concurrent.ConcurrentHashMap
+import org.springframework.scheduling.annotation.Scheduled
 
 /**
  * VaultWebSocketHandler
@@ -13,6 +14,34 @@ import java.util.concurrent.ConcurrentHashMap
  */
 @Component
 class VaultWebSocketHandler : TextWebSocketHandler() {
+
+    /**
+     * Heartbeat Mechanism (Keep-Alive)
+     * * This function runs periodically to ensure the WebSocket connection remains active.
+     * Many network intermediaries (like proxies or load balancers) may close idle
+     * connections if no data is transmitted within a specific timeframe.
+     */
+    @Scheduled(fixedRate = 20000) // Executes every 20 seconds
+    fun sendHeartbeat() {
+        // Create a lightweight JSON payload to signal that the Bridge is still online
+        val heartbeatMessage = TextMessage(
+            """{"type": "heartbeat", "timestamp": "${System.currentTimeMillis()}"}"""
+        )
+        println("--- [BRIDGE] Sending heartbeat to 1 active sessions ---")
+
+        // Iterate through all active Vault sessions
+        sessions.values.forEach { session ->
+            if (session.isOpen) {
+                try {
+                    // Send the heartbeat signal to the connected Vault
+                    session.sendMessage(heartbeatMessage)
+                } catch (e: Exception) {
+                    // Log failure if a message cannot be delivered to a specific session
+                    println("--- [BRIDGE] Failed to send heartbeat to ${session.id}: ${e.message} ---")
+                }
+            }
+        }
+    }
 
     /**
      * Companion object to hold shared state across the application.

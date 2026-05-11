@@ -40,6 +40,12 @@ async def run_vault():
         async for message in websocket:
             data = json.loads(message)
 
+            # --- HEARTBEAT HANDLING ---
+            # Skips periodic keep-alive messages from the Bridge to keep the socket active.
+            # This prevents the system from processing system-level pings as actions.
+            if data.get("type") == "heartbeat":
+                continue
+
             # Bridge acknowledges the connection
             if data.get("type") == "connection_ack":
                 print("Bridge acknowledged connection. System is Online.")
