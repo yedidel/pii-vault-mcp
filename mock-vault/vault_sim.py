@@ -2,55 +2,83 @@ import asyncio
 import json
 import websockets
 from eth_account import Account
-from datetime import datetime,timezone
+from datetime import datetime, timezone
 
-# 1. יצירת זהות לכספת (מפתח פרטי וכתובת DID)
-# בייצור אמיתי זה נשמר בכספת, כאן אנחנו מייצרים "על המקום" לצורך הבדיקה
-private_key = "0x" + "1" * 64 # מפתח דמה
+# Vault Identity - Based on a simulated Ethereum private key
+private_key = "0x" + "1" * 64
 account = Account.from_key(private_key)
 vault_did = f"did:ethr:{account.address}"
 
+async def get_user_approval(amount, currency):
+    """
+    Waits for manual user input in the terminal without blocking
+    the asynchronous WebSocket connection.
+    """
+    loop = asyncio.get_event_loop()
+    # input() is a blocking function, so we run it in an executor thread
+    choice = await loop.run_in_executor(
+        None,
+        lambda: input(f"\n[VAULT] Action Required: Authorize payment of {amount} {currency}? (y/n): ")
+    )
+    return choice.lower() == 'y'
+
 async def run_vault():
-    # כתובת ה-Bridge שלך (וודאי שה-Port תואם למה שהגדרת בקוטילין)
-    uri = "ws://localhost:8080/vault-websocket" 
-    
-    print(f"--- Starting Mock Vault ({vault_did}) ---")
-    
+    # The Bridge WebSocket endpoint
+    uri = "ws://localhost:8081/vault-websocket"
+    print(f"--- Mock Vault Started | DID: {vault_did} ---")
+
     async with websockets.connect(uri) as websocket:
-        # 2. הכנת הודעת Handshake (לפי המדריך של הכספת)
+        # Step 1: Secure Handshake to identify this Vault to the Bridge
         handshake = {
             "type": "connection_init",
             "did": vault_did,
-            "vault_public_key": "0x04abc123456789...", # מפתח ציבורי דמה
-            "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
-        
-        # חתימה על ההודעה (דימוי של הוכחת זהות)
-        msg_to_sign = json.dumps(handshake)
-        # כאן בדרך כלל מבצעים חתימה אמיתית, כרגע נשלח סימן חתימה דמה
-        handshake["signature"] = "0x-mock-signature" 
-
-        print(f"Sending handshake to Bridge...")
         await websocket.send(json.dumps(handshake))
+        print("Handshake sent, waiting for Bridge requests...")
 
-        # 3. לולאת האזנה לבקשות מה-Bridge
-        print("Waiting for ActionRequests from Bridge...")
         async for message in websocket:
             data = json.loads(message)
-            print(f"\nReceived request: {data['type']}")
-            
-            if data['type'] == 'payment':
-                print(f"Details: {data['payment_details']['amount']} {data['payment_details']['currency']} to {data['payment_details']['merchant_name']}")
-                
-                # 4. שליחת תגובה (ActionResponse)
-                response = {
-                    "request_id": data["request_id"],
-                    "status": "approved",
-                    "timestamp": datetime.utcnow().isoformat() + "Z",
-                    "vault_did": vault_did
-                }
+
+            # Bridge acknowledges the connection
+            if data.get("type") == "connection_ack":
+                print("Bridge acknowledged connection. System is Online.")
+
+            # Handling incoming payment authorization requests from Claude/Bridge
+            elif data.get("type") == "payment_request":
+                request_id = data.get('request_id')
+                amount = data.get('amount')
+                currency = data.get('currency')
+
+                print(f"\n--- [VAULT] New Request Received: {amount} {currency} ---")
+
+                # --- OPTION A: MANUAL APPROVAL (Default) ---
+                # This will wait for you to type 'y' or 'n' in this terminal
+                is_approved = await get_user_approval(amount, currency)
+
+                # --- OPTION B: AUTO-APPROVAL (Uncomment for testing) ---
+                # is_approved = True
+
+                if is_approved:
+                    response = {
+                        "type": "action_approved",
+                        "request_id": request_id,
+                        "signature": "0x-digital-sig-of-vault-authorized"
+                    }
+                    print(f"--- [VAULT] Approval sent for ID: {request_id} ---")
+                else:
+                    response = {
+                        "type": "action_rejected",
+                        "request_id": request_id,
+                        "reason": "User declined the transaction manually"
+                    }
+                    print(f"--- [VAULT] Rejection sent for ID: {request_id} ---")
+
+                # Send the final decision back to the Bridge
                 await websocket.send(json.dumps(response))
-                print(f"Sent approval for request {data['request_id']}")
 
 if __name__ == "__main__":
-    asyncio.run(run_vault())
+    try:
+        asyncio.run(run_vault())
+    except KeyboardInterrupt:
+        print("\nVault shutting down...")
