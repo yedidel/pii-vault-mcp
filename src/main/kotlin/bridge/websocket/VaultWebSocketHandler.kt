@@ -7,6 +7,10 @@ import org.springframework.web.socket.WebSocketSession
 import org.springframework.web.socket.handler.TextWebSocketHandler
 import java.util.concurrent.ConcurrentHashMap
 import org.springframework.scheduling.annotation.Scheduled
+import org.web3j.crypto.Keys
+import org.web3j.crypto.Sign
+import org.web3j.utils.Numeric
+import org.json.JSONObject
 
 /**
  * VaultWebSocketHandler
@@ -67,25 +71,52 @@ class VaultWebSocketHandler : TextWebSocketHandler() {
      * Extracts the requestId and updates the pendingResponses map based on the payload.
      */
     override fun handleTextMessage(session: WebSocketSession, message: TextMessage) {
-        val payload = message.payload
-        println("--- [BRIDGE] RAW PAYLOAD RECEIVED: $payload ---")
+        val json = JSONObject(message.payload)
+        val type = json.optString("type")
 
-        // Regex to extract 'request_id' or 'requestId' regardless of spacing or quotes
-        val idPattern = """"(?:request_id|requestId)"\s*:\s*"([^"]+)"""".toRegex()
-        val match = idPattern.find(payload)
-        val extractedId = match?.groups?.get(1)?.value
+        if (type == "connection_init") {
+            val did = json.getString("did")
+            val timestamp = json.getString("timestamp")
+            val signature = json.getString("signature")
 
-        if (extractedId != null) {
-            println("--- [BRIDGE] Found ID: $extractedId ---")
-
-            // Logic to determine if the user approved or rejected the action
-            if (payload.contains("action_approved")) {
-                pendingResponses[extractedId] = "APPROVED"
-                println("--- [BRIDGE] Marked as APPROVED ---")
-            } else if (payload.contains("action_rejected")) {
-                pendingResponses[extractedId] = "REJECTED"
-                println("--- [BRIDGE] Marked as REJECTED ---")
+            // --- English Documentation ---
+            // Security Check: Verify that the Vault actually owns the DID it claims to have.
+            // If the signature is invalid, we close the session immediately.
+            if (isSignatureValid(did, timestamp, signature)) {
+                println("--- [BRIDGE] Vault verified successfully: $did ---")
+                session.sendMessage(TextMessage("""{"type": "connection_ack"}"""))
+            } else {
+                println("--- [BRIDGE] SECURITY ALERT: Invalid signature from $did. Closing connection. ---")
+                session.close()
             }
+        }
+    }
+
+    /**
+     * Recovers the Ethereum address from the provided signature and compares it with the DID.
+     */
+    private fun isSignatureValid(did: String, timestamp: String, signature: String): Boolean {
+        return try {
+            val message = "vault_auth_$timestamp"
+            val msgBytes = message.toByteArray()
+
+            // Ethereum specific prefix requirement
+            val prefix = "\u0019Ethereum Signed Message:\n${msgBytes.size}".toByteArray()
+            val totalMsg = prefix + msgBytes
+
+            val signatureBytes = Numeric.hexStringToByteArray(signature)
+            val v = signatureBytes[64]
+            val r = signatureBytes.copyOfRange(0, 32)
+            val s = signatureBytes.copyOfRange(32, 64)
+
+            val sd = Sign.SignatureData(v, r, s)
+            val ecKey = Sign.signedMessageToKey(totalMsg, sd)
+            val recoveredAddress = "0x" + Keys.getAddress(ecKey)
+
+            // Check if the address in the DID matches the recovered address from the signature
+            did.contains(recoveredAddress, ignoreCase = true)
+        } catch (e: Exception) {
+            false
         }
     }
 

@@ -2,7 +2,17 @@ import asyncio
 import json
 import websockets
 from eth_account import Account
+from eth_account.messages import encode_defunct
 from datetime import datetime, timezone
+
+# --- Professional Documentation ---
+# Helper function to sign the connection handshake.
+# It signs a unique string containing the timestamp using the Private Key.
+def sign_handshake(timestamp, p_key):
+    message_text = f"vault_auth_{timestamp}"
+    ms_encoded = encode_defunct(text=message_text)
+    signed_message = Account.sign_message(ms_encoded, private_key=p_key)
+    return signed_message.signature.hex()
 
 # Vault Identity - Based on a simulated Ethereum private key
 private_key = "0x" + "1" * 64
@@ -15,7 +25,6 @@ async def get_user_approval(amount, currency):
     the asynchronous WebSocket connection.
     """
     loop = asyncio.get_event_loop()
-    # input() is a blocking function, so we run it in an executor thread
     choice = await loop.run_in_executor(
         None,
         lambda: input(f"\n[VAULT] Action Required: Authorize payment of {amount} {currency}? (y/n): ")
@@ -28,21 +37,25 @@ async def run_vault():
     print(f"--- Mock Vault Started | DID: {vault_did} ---")
 
     async with websockets.connect(uri) as websocket:
-        # Step 1: Secure Handshake to identify this Vault to the Bridge
+        # --- SECURE HANDSHAKE STEP ---
+        # We generate the timestamp and signature RIGHT BEFORE sending
+        current_ts = datetime.now(timezone.utc).isoformat()
+        handshake_signature = sign_handshake(current_ts, private_key)
+
         handshake = {
             "type": "connection_init",
             "did": vault_did,
-            "timestamp": datetime.now(timezone.utc).isoformat()
+            "timestamp": current_ts,
+            "signature": handshake_signature  # Now includes cryptographic proof
         }
+        print(f"DEBUG: Sending Handshake -> {json.dumps(handshake, indent=2)}")
         await websocket.send(json.dumps(handshake))
-        print("Handshake sent, waiting for Bridge requests...")
+        print(f"Secure handshake sent with signature, waiting for Bridge requests...")
 
         async for message in websocket:
             data = json.loads(message)
 
             # --- HEARTBEAT HANDLING ---
-            # Skips periodic keep-alive messages from the Bridge to keep the socket active.
-            # This prevents the system from processing system-level pings as actions.
             if data.get("type") == "heartbeat":
                 continue
 
@@ -50,7 +63,7 @@ async def run_vault():
             if data.get("type") == "connection_ack":
                 print("Bridge acknowledged connection. System is Online.")
 
-            # Handling incoming payment authorization requests from Claude/Bridge
+            # Handling incoming payment authorization requests
             elif data.get("type") == "payment_request":
                 request_id = data.get('request_id')
                 amount = data.get('amount')
@@ -58,18 +71,15 @@ async def run_vault():
 
                 print(f"\n--- [VAULT] New Request Received: {amount} {currency} ---")
 
-                # --- OPTION A: MANUAL APPROVAL (Default) ---
-                # This will wait for you to type 'y' or 'n' in this terminal
+                # Manual approval logic (untouched)
                 is_approved = await get_user_approval(amount, currency)
-
-                # --- OPTION B: AUTO-APPROVAL (Uncomment for testing) ---
-                # is_approved = True
 
                 if is_approved:
                     response = {
                         "type": "action_approved",
                         "request_id": request_id,
-                        "signature": "0x-digital-sig-of-vault-authorized"
+                        # Note: In the future, this signature will also be dynamic (E2EE)
+                        "signature": "0x-authorized-by-vault"
                     }
                     print(f"--- [VAULT] Approval sent for ID: {request_id} ---")
                 else:
@@ -80,7 +90,6 @@ async def run_vault():
                     }
                     print(f"--- [VAULT] Rejection sent for ID: {request_id} ---")
 
-                # Send the final decision back to the Bridge
                 await websocket.send(json.dumps(response))
 
 if __name__ == "__main__":

@@ -39,6 +39,8 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-webflux")
     implementation("io.projectreactor:reactor-core")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+    implementation("org.web3j:core:4.9.4")
+    implementation("org.json:json:20231013")
 
 }
 
