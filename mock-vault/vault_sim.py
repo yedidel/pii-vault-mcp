@@ -1,99 +1,66 @@
 import asyncio
 import json
 import websockets
-from eth_account import Account
-from eth_account.messages import encode_defunct
-from datetime import datetime, timezone
+import base64
+
 
 # --- Professional Documentation ---
-# Helper function to sign the connection handshake.
-# It signs a unique string containing the timestamp using the Private Key.
-def sign_handshake(timestamp, p_key):
-    message_text = f"vault_auth_{timestamp}"
-    ms_encoded = encode_defunct(text=message_text)
-    signed_message = Account.sign_message(ms_encoded, private_key=p_key)
-    return signed_message.signature.hex()
+# This Mock Vault simulates the external security API.
+# It handles "Encrypted" payloads by decoding Base64 data,
+# simulating the decryption process that the real Vault would perform.
 
-# Vault Identity - Based on a simulated Ethereum private key
-private_key = "0x" + "1" * 64
-account = Account.from_key(private_key)
-vault_did = f"did:ethr:{account.address}"
+VAULT_DID = "did:ethr:0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A"
 
-async def get_user_approval(amount, currency):
+async def get_user_approval(decrypted_data):
     """
-    Waits for manual user input in the terminal without blocking
-    the asynchronous WebSocket connection.
+    Simulates user interaction.
+    In a real scenario, the user would see the decrypted details on their device.
     """
     loop = asyncio.get_event_loop()
+    print(f"\n[MOCK-DECRYPTED-DATA]: {decrypted_data}")
     choice = await loop.run_in_executor(
         None,
-        lambda: input(f"\n[VAULT] Action Required: Authorize payment of {amount} {currency}? (y/n): ")
+        lambda: input("Authorize this transaction? (y/n): ")
     )
     return choice.lower() == 'y'
 
 async def run_vault():
-    # The Bridge WebSocket endpoint
     uri = "ws://localhost:8081/vault-websocket"
-    print(f"--- Mock Vault Started | DID: {vault_did} ---")
+    print(f"--- Mock Vault Online | DID: {VAULT_DID} ---")
 
     async with websockets.connect(uri) as websocket:
-        # --- SECURE HANDSHAKE STEP ---
-        # We generate the timestamp and signature RIGHT BEFORE sending
-        current_ts = datetime.now(timezone.utc).isoformat()
-        handshake_signature = sign_handshake(current_ts, private_key)
-
+        # Step 1: Protocol Handshake
         handshake = {
             "type": "connection_init",
-            "did": vault_did,
-            "timestamp": current_ts,
-            "signature": handshake_signature  # Now includes cryptographic proof
+            "did": VAULT_DID,
+            "signature": "mock_handshake_sig"
         }
-        print(f"DEBUG: Sending Handshake -> {json.dumps(handshake, indent=2)}")
         await websocket.send(json.dumps(handshake))
-        print(f"Secure handshake sent with signature, waiting for Bridge requests...")
 
         async for message in websocket:
             data = json.loads(message)
 
-            # --- HEARTBEAT HANDLING ---
-            if data.get("type") == "heartbeat":
-                continue
-
-            # Bridge acknowledges the connection
             if data.get("type") == "connection_ack":
-                print("Bridge acknowledged connection. System is Online.")
+                print("Connection to Bridge established.")
 
-            # Handling incoming payment authorization requests
             elif data.get("type") == "payment_request":
-                request_id = data.get('request_id')
-                amount = data.get('amount')
-                currency = data.get('currency')
+                # --- SIMULATED DECRYPTION ---
+                # We treat the 'data' field as an encrypted blob.
+                encrypted_blob = data.get("data")
+                decrypted_bytes = base64.b64decode(encrypted_blob)
+                decrypted_text = decrypted_bytes.decode('utf-8')
 
-                print(f"\n--- [VAULT] New Request Received: {amount} {currency} ---")
+                req_id = data.get('request_id')
+                approved = await get_user_approval(decrypted_text)
 
-                # Manual approval logic (untouched)
-                is_approved = await get_user_approval(amount, currency)
-
-                if is_approved:
-                    response = {
-                        "type": "action_approved",
-                        "request_id": request_id,
-                        # Note: In the future, this signature will also be dynamic (E2EE)
-                        "signature": "0x-authorized-by-vault"
-                    }
-                    print(f"--- [VAULT] Approval sent for ID: {request_id} ---")
-                else:
-                    response = {
-                        "type": "action_rejected",
-                        "request_id": request_id,
-                        "reason": "User declined the transaction manually"
-                    }
-                    print(f"--- [VAULT] Rejection sent for ID: {request_id} ---")
-
+                # Step 2: Response with status logic
+                response = {
+                    "type": "action_approved" if approved else "action_rejected",
+                    "request_id": req_id,
+                    "status": "SUCCESS" if approved else "USER_DECLINED"
+                }
                 await websocket.send(json.dumps(response))
+                print(f"Response for {req_id} sent.")
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(run_vault())
-    except KeyboardInterrupt:
-        print("\nVault shutting down...")
+    asyncio.run(run_vault())
