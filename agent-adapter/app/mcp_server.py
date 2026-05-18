@@ -1,9 +1,18 @@
 from mcp.server.fastmcp import FastMCP
+import json
 import main
 from models import ActionRequestModel
 import time
+from workflow_service import WorkflowService
 
 mcp=FastMCP("bridge-adapter")
+with open("vault_config.json") as f:
+    config = json.load(f)
+
+USER_INSTALL_ID = config["userInstallId"]
+
+workflow_service = WorkflowService()
+
 
 
 @mcp.tool(
@@ -13,7 +22,7 @@ mcp=FastMCP("bridge-adapter")
     - TRANSACTION → parameters: amount, currency, target
     - FILL_FORM → parameters: id, email, password, name"""
 )
-def send_action(agentId: str, userInstallId: str,actionType:str ,parameters:dict[str, str]):
+def send_action(agentId: str,actionType:str ,parameters:dict[str, str],sessionReference: str,platform: str):
     """
     Send an action request to the Bridge system.
     Allowed action types:
@@ -22,12 +31,15 @@ def send_action(agentId: str, userInstallId: str,actionType:str ,parameters:dict
     FILL_FORM
     """
     try:
+
         response= main.send_action(ActionRequestModel(
             agentId=agentId,
-            userInstallId=userInstallId,
+            userInstallId=USER_INSTALL_ID,
             actionType=actionType,
             parameters=parameters
         ))
+
+
         return {
             "requestId": response["requestId"],
             "status": response["status"],
@@ -55,7 +67,6 @@ def get_action_status(requestId: str):
                 "RECEIVED",
                 "IN_PROGRESS"
             ]:
-
                 return {
                     "requestId": response["requestId"],
                     "status": current_status,
@@ -72,6 +83,14 @@ def get_action_status(requestId: str):
 
     except Exception as e:
         return {"error": str(e)}
+
+
+
+
+CONTINUATION_HANDLERS = {
+    "claude": handle_claude,
+    "openai": handle_openai
+}
 
 
 if __name__ == "__main__":
