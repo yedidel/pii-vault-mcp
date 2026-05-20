@@ -17,6 +17,7 @@ def send_action():
                 "amount": "100",
                 "currency": "USD"
             }
+
         )
 
         try:

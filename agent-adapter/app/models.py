@@ -15,9 +15,16 @@ class ActionRequestModel(BaseModel):
     #the information of the action
     parameters: Dict[str, str]
 
+    #for work flow
+
+    #platform of agent
+    platform: str
+    #session id of agent
+    sessionId: str
+
 
 class WorkflowModel(BaseModel):
-    #internal id worrk flow
+    #internal id work flow
     workflowId:str
     #id from bridge
     requestId:str
@@ -25,9 +32,4 @@ class WorkflowModel(BaseModel):
     platform:str
     #session of chat
     agentSessionId:str
-    #status of the action from db
-    currentStatus:str
-    #which workflow we want to make from request
-    actionType:str
-    #description of action
-    description: str
+

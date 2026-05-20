@@ -9,6 +9,8 @@ def map_to_proto(model: ActionRequestModel):
     proto.agent_id = model.agentId
     proto.user_install_id = model.userInstallId
     proto.action_type = model.actionType
+    proto.platform=model.platform
+    proto.session_id=model.sessionId
 
     for key, value in model.parameters.items():
         proto.parameters[key] = value

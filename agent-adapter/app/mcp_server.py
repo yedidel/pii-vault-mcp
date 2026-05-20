@@ -37,14 +37,18 @@ def send_action(agentId: str,actionType:str ,parameters:dict[str, str],sessionId
             agentId=agentId,
             userInstallId=USER_INSTALL_ID,
             actionType=actionType,
-            parameters=parameters
+            parameters=parameters,
+            platform=platform,
+            sessionId=sessionId
         )
         #create workflow with the request
-        return workflow_service.create_workflow(actionRequest,platform,sessionId)
+        return main.send_action(actionRequest)
 
     except Exception as e:
         return {"error": str(e)}
 
+
+#get status of action
 @mcp.tool(
     description="Get the status of a previously sent action request to the Bridge system"
 )
@@ -52,18 +56,35 @@ def send_action(agentId: str,actionType:str ,parameters:dict[str, str],sessionId
 def get_action_status(requestId: str):
 
     try:
+        #loop of getting status while action not end or 20 times , temporary
+        for _ in range(20):
 
+            response = main.get_status(requestId)
+
+            current_status = response["status"]
+
+            if current_status not in [
+                "RECEIVED",
+                "IN_PROGRESS"
+            ]:
+                return {
+                    "requestId": response["requestId"],
+                    "status": current_status,
+                    "resultData": response["resultData"]
+                }
+
+            time.sleep(1)
+
+        return {
+            "requestId": response["requestId"],
+            "status": current_status,
+            "message": "Workflow still running"
+        }
 
     except Exception as e:
         return {"error": str(e)}
 
 
-
-
-CONTINUATION_HANDLERS = {
-    "claude": handle_claude,
-    "openai": handle_openai
-}
 
 
 if __name__ == "__main__":

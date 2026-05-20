@@ -28,5 +28,4 @@ class WorkflowEntity (
     //agent session id
     @Column(name="agent_session_id", nullable = false)
     var agentSessionId: String
-
     )

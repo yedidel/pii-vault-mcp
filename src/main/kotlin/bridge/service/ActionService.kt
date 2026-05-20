@@ -10,7 +10,9 @@ import java.util.UUID
 @Service
 class ActionService(
     private val actionRepository: ActionRepository,
-    private val objectMapper: ObjectMapper){
+    private val objectMapper: ObjectMapper,
+    //reference to WorkflowService
+    private val workflowService: WorkflowService){
 
     /**
      * Validates the request and checks if the agent is authorized.
@@ -108,7 +110,12 @@ class ActionService(
             resultData = null
         )
         val savedEntity = actionRepository.save(newEntity)
-
+        //save to work flow
+        workflowService.createWorkflow(
+            requestId = savedEntity.requestId,
+            platform = request.platform,
+            sessionId = request.sessionId
+        )
         //to do - saved to Kafka
         return ActionResponse.newBuilder()
             .setRequestId(savedEntity.requestId)

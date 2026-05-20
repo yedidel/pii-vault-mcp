@@ -11,6 +11,8 @@ message ActionRequest {
   string user_install_id = 2; //id that of app on specific device, used to send push notifications to the user
   string action_type = 3;
   map<string, string> parameters = 4;
+  string platform=5;
+  string session_id=6;
 }
 //answer to the initial request, with the generated UUID and initial status
 message ActionResponse {
