@@ -1,6 +1,7 @@
 from mcp.server.fastmcp import FastMCP
 import json
 import main
+import models
 from models import ActionRequestModel
 import time
 from workflow_service import WorkflowService
@@ -22,7 +23,7 @@ workflow_service = WorkflowService()
     - TRANSACTION → parameters: amount, currency, target
     - FILL_FORM → parameters: id, email, password, name"""
 )
-def send_action(agentId: str,actionType:str ,parameters:dict[str, str],sessionReference: str,platform: str):
+def send_action(agentId: str,actionType:str ,parameters:dict[str, str],sessionId: str,platform: str):
     """
     Send an action request to the Bridge system.
     Allowed action types:
@@ -31,20 +32,16 @@ def send_action(agentId: str,actionType:str ,parameters:dict[str, str],sessionRe
     FILL_FORM
     """
     try:
-
-        response= main.send_action(ActionRequestModel(
+        #create action request
+        actionRequest = models.ActionRequestModel(
             agentId=agentId,
             userInstallId=USER_INSTALL_ID,
             actionType=actionType,
             parameters=parameters
-        ))
+        )
+        #create workflow with the request
+        return workflow_service.create_workflow(actionRequest,platform,sessionId)
 
-
-        return {
-            "requestId": response["requestId"],
-            "status": response["status"],
-            "description": response["description"]
-        }
     except Exception as e:
         return {"error": str(e)}
 
@@ -52,34 +49,10 @@ def send_action(agentId: str,actionType:str ,parameters:dict[str, str],sessionRe
     description="Get the status of a previously sent action request to the Bridge system"
 )
 
-
 def get_action_status(requestId: str):
 
     try:
 
-        for _ in range(20):
-
-            response = main.get_status(requestId)
-
-            current_status = response["status"]
-
-            if current_status not in [
-                "RECEIVED",
-                "IN_PROGRESS"
-            ]:
-                return {
-                    "requestId": response["requestId"],
-                    "status": current_status,
-                    "resultData": response["resultData"]
-                }
-
-            time.sleep(1)
-
-        return {
-            "requestId": response["requestId"],
-            "status": current_status,
-            "message": "Workflow still running"
-        }
 
     except Exception as e:
         return {"error": str(e)}

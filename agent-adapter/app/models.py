@@ -15,9 +15,10 @@ class ActionRequestModel(BaseModel):
     #the information of the action
     parameters: Dict[str, str]
 
+
 class WorkflowModel(BaseModel):
     #internal id worrk flow
-    workFlowId:str
+    workflowId:str
     #id from bridge
     requestId:str
     #like claude, gpt
@@ -28,3 +29,5 @@ class WorkflowModel(BaseModel):
     currentStatus:str
     #which workflow we want to make from request
     actionType:str
+    #description of action
+    description: str
