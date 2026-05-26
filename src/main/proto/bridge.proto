@@ -32,13 +32,13 @@ message StatusResponse {
   google.protobuf.Timestamp updated_at = 4; //to indicate when the status was last updated, useful for clients to know if they should check again later
 }
 enum StatusType {
-  STATUS_TYPE_UNSPECIFIED = 0;
-  RECEIVED = 1;
-  WAITING_FOR_USER = 2;
-  IN_PROGRESS = 3;
-  COMPLETED = 4;
-  FAILED = 5;
-  REJECTED = 6;
-  EXPIRED = 7;
-  FAILED_APP_NOT_INSTALLED = 8;
+  STATUS_TYPE_UNSPECIFIED = 0;//default
+  RECEIVED = 1;//the request received by bridge
+  WAITING_FOR_USER = 2; //wait for approve by the user from volet
+  IN_PROGRESS = 3;//between volet and approve by gard
+  COMPLETED = 4;//the action completed
+  FAILED = 5;//the action completed with fail
+  REJECTED = 6;//reject by gard
+  EXPIRED = 7;//TODO:check if necessary
+  FAILED_APP_NOT_INSTALLED = 8;//app not install
 }

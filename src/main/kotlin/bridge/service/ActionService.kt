@@ -1,9 +1,11 @@
 package bridge
+import bridge.ActionEventService
 import bridge.repository.ActionRepository
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.stereotype.Service
 import bridge.Bridge.*
 import bridge.model.ActionEntity
+import bridge.service.ActionEventPublisherService
 import io.grpc.Status
 import org.springframework.web.client.RestTemplate
 
@@ -16,7 +18,9 @@ data class AuthResponse(
 
 class ActionService(
     private val actionRepository: ActionRepository,
-    private val objectMapper: ObjectMapper){
+    private val objectMapper: ObjectMapper,
+    private val actionEventService: ActionEventService,
+    private val actionEventPublisherServiceService:ActionEventPublisherService){
     // REST client used to communicate with the Guardian (Project C)
     private val restTemplate = RestTemplate()
     // Guardian Authentication Endpoint
@@ -181,12 +185,16 @@ class ActionService(
                 .asException()
         }
 
+        val oldStatus = action.status
         // Update fields from the Vault response
         action.status = finalStatus
         action.resultData = resultData
-
         // Persist changes to the database
         actionRepository.save(action)
+        val event =actionEventService.checkIfChange(requestId,oldStatus,finalStatus)
+        if(event!=null){
+            actionEventPublisherServiceService.publish(event)
+        }
         println("--- [DB] Persistence Update: Action $requestId transitioned to $finalStatus ---")
     }
     /**
