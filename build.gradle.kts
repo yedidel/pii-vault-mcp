@@ -2,6 +2,7 @@ import com.google.protobuf.gradle.id
 import org.jlleitschuh.gradle.ktlint.tasks.KtLintCheckTask
 import org.jlleitschuh.gradle.ktlint.tasks.KtLintFormatTask
 
+
 plugins {
     kotlin("jvm") version "1.9.22"
     kotlin("plugin.jpa") version "1.9.22"
@@ -33,8 +34,12 @@ dependencies {
     implementation("com.fasterxml.jackson.core:jackson-databind")
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.kafka:spring-kafka")
+    implementation("org.springframework.boot:spring-boot-starter-websocket")
+    implementation("org.springframework.boot:spring-boot-starter-webflux")
+    implementation("io.projectreactor:reactor-core")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+    implementation("org.json:json:20231013")
 }
-
 protobuf {
     protoc {
         artifact = "com.google.protobuf:protoc:3.25.1"

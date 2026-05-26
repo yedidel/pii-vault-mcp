@@ -6,7 +6,6 @@ import time
 from workflow_service import WorkflowService
 from pathlib import Path
 
-
 BASE_DIR = Path(__file__).parent
 CONFIG_PATH = BASE_DIR / "vault_config.json"
 
