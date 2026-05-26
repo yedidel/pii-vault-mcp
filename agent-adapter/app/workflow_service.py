@@ -1,5 +1,4 @@
 import time
-
 from continuations import resume_agent
 import main
 from models import ActionRequestModel, WorkflowModel
@@ -12,6 +11,7 @@ class WorkflowService:
     def create_workflow(self,action_request:ActionRequestModel,platform:str,session_id:str):
         response=main.send_action(action_request)
         return WorkflowModel(
+            workflowId=str(uuid.uuid4()),
             requestId=response["requestId"],
             currentStatus=response["status"],
             platform=platform,

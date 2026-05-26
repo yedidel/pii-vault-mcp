@@ -2,18 +2,22 @@ from mcp.server.fastmcp import FastMCP
 import json
 import main
 import models
-from models import ActionRequestModel
 import time
 from workflow_service import WorkflowService
+from pathlib import Path
 
-mcp=FastMCP("bridge-adapter")
-with open("vault_config.json") as f:
+
+BASE_DIR = Path(__file__).parent
+CONFIG_PATH = BASE_DIR / "vault_config.json"
+
+mcp = FastMCP("bridge-adapter")
+
+with open(CONFIG_PATH) as f:
     config = json.load(f)
 
 USER_INSTALL_ID = config["userInstallId"]
 
 workflow_service = WorkflowService()
-
 
 
 @mcp.tool(
@@ -23,17 +27,25 @@ workflow_service = WorkflowService()
     - TRANSACTION → parameters: amount, currency, target
     - FILL_FORM → parameters: id, email, password, name"""
 )
-def send_action(agentId: str,actionType:str ,parameters:dict[str, str],sessionId: str,platform: str):
+def send_action(
+        agentId: str,
+        actionType: str,
+        parameters: dict[str, str],
+        sessionId: str,
+        platform: str
+):
     """
     Send an action request to the Bridge system.
+
     Allowed action types:
     PAYMENT
     TRANSACTION
     FILL_FORM
     """
+
     try:
-        #create action request
-        actionRequest = models.ActionRequestModel(
+        # create action request
+        action_request = models.ActionRequestModel(
             agentId=agentId,
             userInstallId=USER_INSTALL_ID,
             actionType=actionType,
@@ -41,25 +53,28 @@ def send_action(agentId: str,actionType:str ,parameters:dict[str, str],sessionId
             platform=platform,
             sessionId=sessionId
         )
-        #create workflow with the request
-        return main.send_action(actionRequest)
+
+        # send action to bridge
+        return main.send_action(action_request)
 
     except Exception as e:
         return {"error": str(e)}
 
 
-#get status of action
+# get status of action
 @mcp.tool(
     description="Get the status of a previously sent action request to the Bridge system"
 )
-
-def get_action_status(requestId: str):
+def get_action_status(request_id: str):
 
     try:
-        #loop of getting status while action not end or 20 times , temporary
+        response = None
+        current_status = None
+
+        # poll bridge status
         for _ in range(20):
 
-            response = main.get_status(requestId)
+            response = main.get_status(request_id)
 
             current_status = response["status"]
 
@@ -75,6 +90,11 @@ def get_action_status(requestId: str):
 
             time.sleep(1)
 
+        if response is None:
+            return {
+                "error": "No response received from bridge"
+            }
+
         return {
             "requestId": response["requestId"],
             "status": current_status,
@@ -83,8 +103,6 @@ def get_action_status(requestId: str):
 
     except Exception as e:
         return {"error": str(e)}
-
-
 
 
 if __name__ == "__main__":

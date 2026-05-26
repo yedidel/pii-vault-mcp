@@ -33,3 +33,8 @@ class WorkflowModel(BaseModel):
     #session of chat
     agentSessionId:str
 
+    currentStatus: str
+
+    actionType: str
+
+    description: str
