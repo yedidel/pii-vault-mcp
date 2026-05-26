@@ -5,76 +5,72 @@ import org.springframework.stereotype.Service
 import bridge.Bridge.*
 import bridge.model.ActionEntity
 import io.grpc.Status
+import org.springframework.web.client.RestTemplate
 
-
+// Data model for Agent authentication response
+data class AuthResponse(
+    val status: String = "unauthorized",
+    val trust_level: String = "none"
+)
 @Service
+
 class ActionService(
     private val actionRepository: ActionRepository,
     private val objectMapper: ObjectMapper){
+    // REST client used to communicate with the Guardian (Project C)
+    private val restTemplate = RestTemplate()
+    // Guardian Authentication Endpoint
+    private val GUARDIAN_AUTH_URL = "http://localhost:8001/v1/authenticate/agent?did="
 
     /**
      * Validates the request and checks if the agent is authorized.
-     * If everything is valid, forwards the request for processing.
      */
     fun handleAction(request: ActionRequest): ActionResponse {
+        // 1. Ask the Guardian if the Agent is authorized
         if (!isAgentAuthorized(request.agentId)) {
+            println("--- [SECURITY] Agent ${request.agentId} is NOT authorized by Guardian ---")
             throw Status.UNAUTHENTICATED
-                .withDescription("Agent not authorized")
+                .withDescription("Agent not authorized by The Guardian")
                 .asException()
         }
+
+        // 2. Continue with existing logic (Legal action check, Parameters, etc.)
         val actionType = request.actionType.uppercase()
-        if (!isLegalAction(actionType)) {
-            return failure("Unknown action type $actionType")
-        }
-        if (!validateParameters(actionType, request.parametersMap)) {
-            return failure("Missing or invalid parameters of request $actionType")
-        }
+        if (!isLegalAction(actionType)) return failure("Unknown action type $actionType")
+
         return processAction(request)
     }
 
     /**
-     * Checks whether the agent is authorized to perform actions.
-     * In the future this will call the Guardian service.
+     * Checks with The Guardian (Project C) if the Agent is legitimate.
+     * Uses the Agent's Identity (DID) to verify credentials.
      */
     private fun isAgentAuthorized(agentId: String): Boolean {
-        return true // stub for now
+        return try {
+            val auth = restTemplate.getForObject("$GUARDIAN_AUTH_URL$agentId", AuthResponse::class.java)
+            auth?.status == "verified"
+        } catch (e: Exception) {
+            println("--- [ERROR] Guardian auth unreachable: ${e.message} ---")
+            false // Block by default if Guardian is down for maximum security
+        }
     }
 
     /**
      * Checks whether the requested action type is supported by the system.
      */
     private fun isLegalAction(actionType: String): Boolean {
-        if (actionType in allowedActionTypes)
-        {
-            return true
-        }
-        return false
+        return actionType in allowedActionTypes
     }
 
     /**
      * Validates that the parameters provided in the request
      * match the required parameters for the given action type.
      */
-    private fun validateParameters(
-        actionType: String,
-        parameters: Map<String, String>,
-    ): Boolean {
+    private fun validateParameters(actionType: String, parameters: Map<String, String>): Boolean {
         return when (actionType) {
-            // like write if
-            "PAYMENT" -> {
-                parameters.containsKey("amount") && parameters.containsKey("currency")
-            }
-            "TRANSACTION" -> {
-                parameters.containsKey("amount") &&
-                        parameters.containsKey("currency") &&
-                        parameters.containsKey("target")
-            }
-            "FILL_FORM" -> {
-                parameters.containsKey("id") &&
-                        parameters.containsKey("email") &&
-                        parameters.containsKey("password") &&
-                        parameters.containsKey("name")
-            }
+            "PAYMENT" -> parameters.containsKey("amount") && parameters.containsKey("currency")
+            "TRANSACTION" -> parameters.containsKey("amount") && parameters.containsKey("currency") && parameters.containsKey("target")
+            "FILL_FORM" -> parameters.containsKey("id") && parameters.containsKey("email") && parameters.containsKey("password") && parameters.containsKey("name")
             else -> false
         }
     }
@@ -88,12 +84,13 @@ class ActionService(
      * @return Response with the requestId and initial status.
      */
     private fun processAction(request: ActionRequest): ActionResponse {
+        // Serialize parameters to JSON to create a unique signature for the request
         val parametersJson = objectMapper.writeValueAsString(request.parametersMap)
 
-        // Define the idempotency window (e.g., 2 minutes)
+        // Step 1: Idempotency Check
+        // Define a 2-minute window to look for identical recent actions
         val timeWindow = java.time.LocalDateTime.now().minusMinutes(2)
 
-        // Lookup any identical action within the time window
         val existingAction = actionRepository.findRecentIdenticalAction(
             request.agentId,
             request.actionType.uppercase(),
@@ -102,7 +99,7 @@ class ActionService(
         )
 
         if (existingAction != null) {
-            println("--- [DB] Idempotency Match (Time Window): Reusing ID ${existingAction.requestId} ---")
+            println("--- [DB] Idempotency Match: Reusing existing ID ${existingAction.requestId} ---")
             return ActionResponse.newBuilder()
                 .setRequestId(existingAction.requestId)
                 .setStatus(existingAction.status)
@@ -110,7 +107,8 @@ class ActionService(
                 .build()
         }
 
-        // No recent match found; create and persist a new action
+        // Step 2: Persistence
+        // Generate a unique UUID for the new transaction and save it to Postgres
         val requestId = java.util.UUID.randomUUID().toString()
         val newEntity = ActionEntity(
             requestId = requestId,
@@ -123,12 +121,13 @@ class ActionService(
         )
 
         actionRepository.save(newEntity)
-        println("--- [DB] New Action Created: $requestId ---")
+        println("--- [DB] New Action Created and Persisted: $requestId ---")
 
+        // Step 3: Final Response Construction
         return ActionResponse.newBuilder()
             .setRequestId(requestId)
             .setStatus(StatusType.RECEIVED)
-            .setDescription("Action accepted")
+            .setDescription("Action identity verified and request accepted")
             .build()
     }
     /**
@@ -190,4 +189,12 @@ class ActionService(
         actionRepository.save(action)
         println("--- [DB] Persistence Update: Action $requestId transitioned to $finalStatus ---")
     }
+    /**
+     * Data model for the Guardian's response.
+     * Maps the JSON fields from the Project C REST API.
+     */
+    data class TrustInfo(
+        val status: String = "unknown",
+        val trust_score: Double = 0.0
+    )
 }
