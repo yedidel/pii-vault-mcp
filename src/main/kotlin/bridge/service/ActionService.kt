@@ -1,5 +1,4 @@
 package bridge
-import bridge.ActionEventService
 import bridge.repository.ActionRepository
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.stereotype.Service
@@ -185,13 +184,21 @@ class ActionService(
                 .asException()
         }
 
+
+        val details = mutableMapOf<String, String>()
+
+        if (resultData != null) {
+            details["result"] = resultData
+        }
         val oldStatus = action.status
         // Update fields from the Vault response
         action.status = finalStatus
         action.resultData = resultData
         // Persist changes to the database
         actionRepository.save(action)
+        //check if status change and create event in case he its true
         val event =actionEventService.checkIfChange(requestId,oldStatus,finalStatus)
+        //publish the event
         if(event!=null){
             actionEventPublisherServiceService.publish(event)
         }
