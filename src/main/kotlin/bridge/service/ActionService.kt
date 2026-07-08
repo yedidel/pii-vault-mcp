@@ -4,26 +4,17 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.stereotype.Service
 import bridge.Bridge.*
 import bridge.model.ActionEntity
-import bridge.service.ActionEventPublisherService
 import io.grpc.Status
-import org.springframework.web.client.RestTemplate
 
-// Data model for Agent authentication response
-data class AuthResponse(
-    val status: String = "unauthorized",
-    val trust_level: String = "none"
-)
+import bridge.integration.AuthResponse
+import bridge.integration.GuardianGatewayAdapter
 @Service
 
 class ActionService(
     private val actionRepository: ActionRepository,
     private val objectMapper: ObjectMapper,
-    private val actionEventService: ActionEventService,
-    private val actionEventPublisherServiceService:ActionEventPublisherService){
-    // REST client used to communicate with the Guardian (Project C)
-    private val restTemplate = RestTemplate()
-    // Guardian Authentication Endpoint
-    private val GUARDIAN_AUTH_URL = "http://localhost:8001/v1/authenticate/agent?did="
+    private val guardianAdapter: GuardianGatewayAdapter
+) {
 
     /**
      * Validates the request and checks if the agent is authorized.
@@ -49,13 +40,7 @@ class ActionService(
      * Uses the Agent's Identity (DID) to verify credentials.
      */
     private fun isAgentAuthorized(agentId: String): Boolean {
-        return try {
-            val auth = restTemplate.getForObject("$GUARDIAN_AUTH_URL$agentId", AuthResponse::class.java)
-            auth?.status == "verified"
-        } catch (e: Exception) {
-            println("--- [ERROR] Guardian auth unreachable: ${e.message} ---")
-            false // Block by default if Guardian is down for maximum security
-        }
+        return guardianAdapter.verifyAgentSync(agentId)
     }
 
     /**
@@ -185,23 +170,11 @@ class ActionService(
         }
 
 
-        val details = mutableMapOf<String, String>()
-
-        if (resultData != null) {
-            details["result"] = resultData
-        }
-        val oldStatus = action.status
         // Update fields from the Vault response
         action.status = finalStatus
         action.resultData = resultData
         // Persist changes to the database
         actionRepository.save(action)
-        //check if status change and create event in case he its true
-        val event =actionEventService.checkIfChange(requestId,oldStatus,finalStatus)
-        //publish the event
-        if(event!=null){
-            actionEventPublisherServiceService.publish(event)
-        }
         println("--- [DB] Persistence Update: Action $requestId transitioned to $finalStatus ---")
     }
     /**

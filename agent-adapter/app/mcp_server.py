@@ -16,7 +16,7 @@ with open(CONFIG_PATH) as f:
 
 USER_INSTALL_ID = config["userInstallId"]
 
-workflow_service = WorkflowService()
+#workflow_service = WorkflowService()
 
 
 @mcp.tool(

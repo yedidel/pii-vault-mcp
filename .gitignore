@@ -64,7 +64,8 @@ build/
 
 ### macOS Python cache ###
 .DS_Store
-
+.idea/
+*.iml
 # gRPC generated files (Python)
 agent-adapter/app/bridge_pb2.py
 agent-adapter/app/bridge_pb2_grpc.py
