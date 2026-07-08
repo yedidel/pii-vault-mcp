@@ -56,8 +56,8 @@ class WorkflowContextLoader(
             requestId = workflow.requestId,
             actionContext = actionContext,
             currentState = workflow.currentState,
-            currentStep = workflow.currentStep
-
+            currentStep = workflow.currentStep,
+            continuationTransport = workflow.continuationTransport
         )
 
     }

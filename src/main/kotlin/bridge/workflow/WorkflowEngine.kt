@@ -48,7 +48,7 @@ class WorkflowEngine(
 
         val decision = typedHandler.handle(context, event)
 
-        commandExecutor.execute(decision)
+        commandExecutor.execute(context, decision)
 
         println("--- [WORKFLOW] Event processing completed for workflow: ${event.workflowId} ---")
     }
@@ -127,7 +127,7 @@ class WorkflowEngine(
                     WorkflowDecision(emptyList())
             }
 
-        commandExecutor.execute(decision)
+        commandExecutor.execute(context,decision)
 
         println("--- [WORKFLOW RECOVERY] Resume completed for workflow: ${context.workflowId} ---")
     }

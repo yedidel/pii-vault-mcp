@@ -1,6 +1,7 @@
 package bridge.workflow
 import bridge.model.WorkflowEntity
 import bridge.repository.WorkflowRepository
+import bridge.transport.TransportType
 import bridge.workflow.events.ActionContext
 import bridge.workflow.events.ActionCreatedEvent
 import bridge.workflow.publisher.WorkflowEventPublisher
@@ -66,7 +67,8 @@ class WorkflowInitializationService(
             agentSessionId = sessionId,
             currentState = WorkflowState.RECEIVED,
             currentStep = WorkflowStep.ACTION_RECEIVED,
-            contextJson = contextJson
+            contextJson = contextJson,
+            continuationTransport = TransportType.POLLING
         )
 
         val savedWorkflow = workflowRepository.save(workflow)

@@ -1,9 +1,9 @@
 package bridge.workflow
 
 import bridge.ActionService
-import bridge.integration.AgentGateway
 import bridge.integration.GuardianGateway
 import bridge.integration.VaultGateway
+import bridge.transport.AgentTransportRegistry
 import bridge.workflow.publisher.WorkflowEventPublisher
 import bridge.workflow.state.WorkflowTransitionService
 import org.springframework.stereotype.Component
@@ -19,17 +19,16 @@ class WorkflowCommandExecutor(
 
     private val workflowEventPublisher: WorkflowEventPublisher,
 
-    private val agentGateway: AgentGateway,
+    private val transportRegistry: AgentTransportRegistry,
 
     private val actionService: ActionService
 
 ) {
-
-    fun execute(decision: WorkflowDecision) {
-        decision.commands.forEach(::execute)
+    fun execute(context: WorkflowContext, decision: WorkflowDecision){
+        decision.commands.forEach {execute(context, it) }
     }
 
-    private fun execute(command: WorkflowCommand) {
+    private fun execute(context: WorkflowContext,command: WorkflowCommand) {
 
         when (command) {
 
@@ -63,9 +62,11 @@ class WorkflowCommandExecutor(
             }
 
             is NotifyAgentCommand -> {
-                agentGateway.notify(
+                transportRegistry.send(
+                    transport = context.continuationTransport,
                     requestId = command.requestId,
                     message = command.message
+
                 )
             }
 

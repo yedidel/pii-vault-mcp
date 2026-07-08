@@ -13,6 +13,7 @@ import jakarta.persistence.Table
 import org.hibernate.annotations.JdbcTypeCode
 import org.hibernate.type.SqlTypes
 import java.time.LocalDateTime
+import bridge.transport.TransportType
 
 /**
  * Represents the internal execution state of a workflow.
@@ -59,7 +60,11 @@ class WorkflowEntity(
     var completedAt: LocalDateTime? = null,
 
     @Column(name = "last_executed_command")
-    var lastExecutedCommand: String? = null
+    var lastExecutedCommand: String? = null,
+
+    @Enumerated(EnumType.STRING)
+    var continuationTransport: TransportType
+
 ) {
 
     @PrePersist

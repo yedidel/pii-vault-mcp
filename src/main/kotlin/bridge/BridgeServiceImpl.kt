@@ -25,10 +25,13 @@ class BridgeServiceImpl(
      * The workflow engine (event-driven) orchestrates the rest.
      *
      * Steps:
-     * 1. Validate agent with Guardian
-     * 2. Persist action
-     * 3. Initialize workflow and publish ActionCreatedEvent
-     * 4. Return immediately (workflow engine handles the rest)
+     * 1. Persist action
+     *
+     * 2. Initialize workflow
+     *
+     * 3. Workflow performs Guardian verification
+     *
+     * 4. Workflow continues asynchronously
      */
     override suspend fun sendAction(request: Bridge.ActionRequest): ActionResponse {
         println("--- [BRIDGE] Processing ${request.actionType} for agent ${request.agentId} ---")
