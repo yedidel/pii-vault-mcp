@@ -56,7 +56,10 @@ class WorkflowEntity(
     var updatedAt: LocalDateTime = LocalDateTime.now(),
 
     @Column(name = "completed_at")
-    var completedAt: LocalDateTime? = null
+    var completedAt: LocalDateTime? = null,
+
+    @Column(name = "last_executed_command")
+    var lastExecutedCommand: String? = null
 ) {
 
     @PrePersist

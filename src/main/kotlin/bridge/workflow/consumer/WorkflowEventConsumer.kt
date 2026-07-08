@@ -23,7 +23,8 @@ class WorkflowEventConsumer(
 
     @KafkaListener(
         topics = ["workflow-events"],
-        groupId = "workflow-engine"
+        groupId = "workflow-engine",
+        containerFactory = "kafkaListenerContainerFactory"
     )
     fun consume(message: String) {
 

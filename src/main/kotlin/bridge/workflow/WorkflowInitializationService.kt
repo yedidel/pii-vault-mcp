@@ -1,5 +1,4 @@
 package bridge.workflow
-
 import bridge.model.WorkflowEntity
 import bridge.repository.WorkflowRepository
 import bridge.workflow.events.ActionContext
@@ -7,6 +6,8 @@ import bridge.workflow.events.ActionCreatedEvent
 import bridge.workflow.publisher.WorkflowEventPublisher
 import org.springframework.stereotype.Service
 import java.util.UUID
+import com.fasterxml.jackson.databind.ObjectMapper
+
 
 /**
  * Initializes workflows and triggers the workflow engine.
@@ -19,8 +20,8 @@ import java.util.UUID
 class WorkflowInitializationService(
 
     private val workflowRepository: WorkflowRepository,
-
-    private val workflowEventPublisher: WorkflowEventPublisher
+    private val workflowEventPublisher: WorkflowEventPublisher,
+    private val objectMapper: ObjectMapper
 
 ) {
 
@@ -45,21 +46,6 @@ class WorkflowInitializationService(
         sessionId: String,
         parameters: Map<String, String>
     ): WorkflowEntity {
-
-        val workflowId = UUID.randomUUID().toString()
-
-        // Create the workflow entity
-        val workflow = WorkflowEntity(
-            workflowId = workflowId,
-            requestId = requestId,
-            platform = platform,
-            agentSessionId = sessionId,
-            currentState = WorkflowState.RECEIVED,
-            currentStep = WorkflowStep.ACTION_RECEIVED
-        )
-
-        val savedWorkflow = workflowRepository.save(workflow)
-
         // Build action context
         val actionContext = ActionContext(
             agentId = agentId,
@@ -69,6 +55,21 @@ class WorkflowInitializationService(
             sessionId = sessionId,
             parameters = parameters
         )
+
+        val workflowId = UUID.randomUUID().toString()
+        val contextJson = objectMapper.writeValueAsString(actionContext)
+        // Create the workflow entity
+        val workflow = WorkflowEntity(
+            workflowId = workflowId,
+            requestId = requestId,
+            platform = platform,
+            agentSessionId = sessionId,
+            currentState = WorkflowState.RECEIVED,
+            currentStep = WorkflowStep.ACTION_RECEIVED,
+            contextJson = contextJson
+        )
+
+        val savedWorkflow = workflowRepository.save(workflow)
 
         // Publish ActionCreatedEvent to Kafka
         val event = ActionCreatedEvent(

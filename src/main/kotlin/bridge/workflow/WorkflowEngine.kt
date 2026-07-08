@@ -2,19 +2,10 @@ package bridge.workflow
 
 import bridge.workflow.events.WorkflowEvent
 import bridge.workflow.handler.AbstractWorkflowEventHandler
-import org.springframework.stereotype.Component
+import bridge.workflow.state.WorkflowTransitionValidator
 import org.springframework.beans.factory.ObjectProvider
+import org.springframework.stereotype.Component
 
-/**
- * Orchestrates workflow execution.
- *
- * Responsibilities:
- * - Load workflow context from repository
- * - Route incoming events to the appropriate handler
- * - Execute the resulting commands
- *
- * The engine contains no business logic; it is a pure orchestrator.
- */
 @Component
 class WorkflowEngine(
 
@@ -22,50 +13,131 @@ class WorkflowEngine(
 
     private val commandExecutor: WorkflowCommandExecutor,
 
-    // Use ObjectProvider to resolve all handlers at runtime without explicit wiring
-    private val handlers: ObjectProvider<List<AbstractWorkflowEventHandler<*>>>
+    private val handlers: ObjectProvider<List<AbstractWorkflowEventHandler<*>>>,
+
+    private val transitionValidator: WorkflowTransitionValidator
 
 ) {
 
-    /**
-     * Process an incoming workflow event.
-     */
     fun process(event: WorkflowEvent) {
+
         println("--- [WORKFLOW] Processing event type: ${event.eventType} for workflow: ${event.workflowId} ---")
 
-        try {
-            // Load the current workflow context
-            val context = contextLoader.load(event.workflowId)
+        val context = contextLoader.load(event.workflowId)
 
-            // Find the handler for this event type
-            val handler = findHandler(event)
-            if (handler == null) {
-                println("--- [WORKFLOW] WARNING: No handler found for event type: ${event.eventType} ---")
-                return
-            }
-
-            // Handle the event and get the decision
-            @Suppress("UNCHECKED_CAST")
-            val typedHandler = handler as AbstractWorkflowEventHandler<WorkflowEvent>
-            val decision = typedHandler.handle(context, event)
-
-            // Execute all commands in the decision
-            commandExecutor.execute(decision)
-
-            println("--- [WORKFLOW] Event processing completed for workflow: ${event.workflowId} ---")
-        } catch (e: Exception) {
-            println("--- [WORKFLOW ERROR] Failed to process event ${event.eventType}: ${e.message} ---")
-            e.printStackTrace()
+        if (!transitionValidator.shouldProcessEvent(context.currentState, event.eventType)) {
+            println(
+                """
+                Ignoring duplicate workflow event
+                Workflow : ${event.workflowId}
+                Event    : ${event.eventType}
+                State    : ${context.currentState}
+                """.trimIndent()
+            )
+            return
         }
+
+        val handler = findHandler(event)
+            ?: throw IllegalStateException(
+                "No handler registered for event type: ${event.eventType}"
+            )
+
+        @Suppress("UNCHECKED_CAST")
+        val typedHandler =
+            handler as AbstractWorkflowEventHandler<WorkflowEvent>
+
+        val decision = typedHandler.handle(context, event)
+
+        commandExecutor.execute(decision)
+
+        println("--- [WORKFLOW] Event processing completed for workflow: ${event.workflowId} ---")
     }
 
     /**
-     * Find the handler for the given event type.
+     * Resume an unfinished workflow after application restart.
+     *
+     * Recovery is state-driven, not event-driven.
+     * It does not publish fake Kafka events.
      */
-    private fun findHandler(event: WorkflowEvent): AbstractWorkflowEventHandler<*>? {
-        return handlers.getIfAvailable()?.find { handler ->
-            handler.eventType == event.eventType
-        }
+    fun resume(workflowId: String) {
+
+        val context = contextLoader.load(workflowId)
+
+        println(
+            """
+            ----- [WORKFLOW RECOVERY] Resuming workflow -----
+            Workflow : ${context.workflowId}
+            Request  : ${context.requestId}
+            State    : ${context.currentState}
+            Step     : ${context.currentStep}
+            """.trimIndent()
+        )
+
+        val decision =
+            when (context.currentState) {
+
+                WorkflowState.RECEIVED ->
+                    WorkflowDecision(
+                        commands = listOf(
+                            TransitionCommand(
+                                workflowId = context.workflowId,
+                                nextState = WorkflowState.WAITING_FOR_GUARDIAN,
+                                nextStep = WorkflowStep.VERIFY_AGENT
+                            ),
+                            VerifyAgentCommand(
+                                workflowId = context.workflowId,
+                                requestId = context.requestId,
+                                context = context.actionContext
+                            )
+                        )
+                    )
+
+                WorkflowState.WAITING_FOR_GUARDIAN ->
+                    WorkflowDecision(
+                        commands = listOf(
+                            VerifyAgentCommand(
+                                workflowId = context.workflowId,
+                                requestId = context.requestId,
+                                context = context.actionContext
+                            )
+                        )
+                    )
+
+                WorkflowState.WAITING_FOR_VAULT_RESPONSE ->
+                    WorkflowDecision(
+                        commands = listOf(
+                            RequestVaultEvaluationCommand(
+                                workflowId = context.workflowId,
+                                requestId = context.requestId,
+                                amount = context.actionContext.parameters["amount"] ?: "",
+                                currency = context.actionContext.parameters["currency"] ?: ""
+                            )
+                        )
+                    )
+
+                WorkflowState.IN_PROGRESS -> {
+                    println(
+                        "--- [WORKFLOW RECOVERY] Workflow is IN_PROGRESS. No recovery command defined yet for ${context.workflowId} ---"
+                    )
+                    WorkflowDecision(emptyList())
+                }
+
+                WorkflowState.COMPLETED,
+                WorkflowState.FAILED ->
+                    WorkflowDecision(emptyList())
+            }
+
+        commandExecutor.execute(decision)
+
+        println("--- [WORKFLOW RECOVERY] Resume completed for workflow: ${context.workflowId} ---")
+    }
+
+    private fun findHandler(
+        event: WorkflowEvent
+    ): AbstractWorkflowEventHandler<*>? {
+
+        return handlers
+            .getIfAvailable()
+            ?.find { it.eventType == event.eventType }
     }
 }
-

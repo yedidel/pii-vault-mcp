@@ -18,7 +18,6 @@ class ActionCreatedEventHandler :
         context: WorkflowContext,
         event: ActionCreatedEvent
     ): WorkflowDecision {
-
         return WorkflowDecision(
 
             commands = listOf(
