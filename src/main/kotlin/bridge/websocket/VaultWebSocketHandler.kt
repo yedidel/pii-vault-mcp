@@ -1,5 +1,10 @@
 package bridge.websocket
+
+import bridge.model.PairingStatus
+import bridge.model.UserVaultLinkEntity
 import bridge.repository.ActionRepository
+import bridge.repository.PairingSessionRepository
+import bridge.repository.UserVaultLinkRepository
 import bridge.repository.WorkflowRepository
 import bridge.workflow.events.ActionContext
 import bridge.workflow.events.ActionResponseReceivedEvent
@@ -14,17 +19,14 @@ import java.util.Base64
 
 @Component
 class VaultWebSocketHandler(
-
     private val workflowRepository: WorkflowRepository,
-
     private val actionRepository: ActionRepository,
-
     private val objectMapper: ObjectMapper,
-
-    private val workflowEventPublisher: WorkflowEventPublisher
-
+    private val workflowEventPublisher: WorkflowEventPublisher,
+    // Injecting the new components needed for User-Vault pairing
+    private val pairingSessionRepository: PairingSessionRepository,
+    private val userVaultLinkRepository: UserVaultLinkRepository
 ) : TextWebSocketHandler() {
-
 
     private var vaultSession: WebSocketSession? = null
 
@@ -39,8 +41,45 @@ class VaultWebSocketHandler(
         when (type) {
 
             "connection_init" -> {
-                println("--- [BRIDGE] Handshake from Vault: ${payload.optString("did")} ---")
+                val vaultDid = payload.optString("did")
+                val pairingToken = payload.optString("pairing_token")
+
+                println("--- [BRIDGE] Handshake from Vault DID: $vaultDid ---")
                 vaultSession = session
+
+                // Check if this connection initialization includes a pairing token
+                if (!pairingToken.isNullOrEmpty()) {
+                    println("--- [BRIDGE] Processing pairing token: $pairingToken ---")
+
+                    // 1. Check if the temporary token exists in the database
+                    val temporarySessionOpt = pairingSessionRepository.findByPairingToken(pairingToken)
+
+                    if (temporarySessionOpt.isEmpty) {
+                        println("--- [BRIDGE ERROR] Pairing failed: Invalid or expired token ---")
+                        val errorResponse = JSONObject()
+                        errorResponse.put("type", "connection_error")
+                        errorResponse.put("message", "Invalid or expired token")
+                        session.sendMessage(TextMessage(errorResponse.toString()))
+                        return
+                    }
+
+                    val tempSession = temporarySessionOpt.get()
+
+                    // 2. Save the permanent relationship between the user and the vault DID
+                    val permanentLink = UserVaultLinkEntity(
+                        userId = tempSession.userId,
+                        vaultDid = vaultDid
+                    )
+                    userVaultLinkRepository.save(permanentLink)
+
+                    // 3. Mark the temporary pairing token session as COMPLETED
+                    tempSession.status = PairingStatus.COMPLETED
+                    pairingSessionRepository.save(tempSession)
+
+                    println("--- [BRIDGE] Successfully paired User: ${tempSession.userId} with Vault DID: $vaultDid ---")
+                }
+
+                // Send the standard acknowledgment back to the Vault application
                 session.sendMessage(TextMessage("""{"type": "connection_ack"}"""))
             }
 

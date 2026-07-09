@@ -14,6 +14,8 @@ mcp = FastMCP("bridge-adapter")
 with open(CONFIG_PATH) as f:
     config = json.load(f)
 
+# Note: This is currently the fallback static ID from the config.
+# Down the line, you can pass a dynamic dynamic user/session ID from the agent platform if available.
 USER_INSTALL_ID = config["userInstallId"]
 
 #workflow_service = WorkflowService()
@@ -43,7 +45,7 @@ def send_action(
     """
 
     try:
-        # create action request
+        # Create action request payload
         action_request = models.ActionRequestModel(
             agentId=agentId,
             userInstallId=USER_INSTALL_ID,
@@ -53,8 +55,30 @@ def send_action(
             sessionId=sessionId
         )
 
-        # send action to bridge
-        return main.send_action(action_request)
+        # Send action to bridge via the gRPC/HTTP main client wrapper
+        response = main.send_action(action_request)
+
+        # Check if the Bridge returned a status indicating the Vault app is not paired/installed
+        if response and response.get("status") == "FAILED_APP_NOT_INSTALLED":
+            description = response.get("description", "")
+
+            # Parse the pipe-delimited pairing details: "PAIRING_REQUIRED|QR_URL|TOKEN"
+            if description.startswith("PAIRING_REQUIRED"):
+                parts = description.split("|")
+                qr_code_url = parts[1]
+                pairing_token = parts[2]
+
+                # Return a structured instructional message directly to the AI agent
+                return (
+                    f"### ⚠️ SECURE VAULT PAIRING REQUIRED\n"
+                    f"No secure vault application is linked to this account.\n\n"
+                    f"Please scan this QR Code directly with your camera:\n\n"
+                    f"![QR Code]({qr_code_url})\n\n"  
+                    f"**Pairing Token:** `{pairing_token}`\n\n"
+                    f"Once paired, please let me know."
+                )
+
+        return response
 
     except Exception as e:
         return {"error": str(e)}

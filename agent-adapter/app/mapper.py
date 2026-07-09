@@ -1,4 +1,5 @@
 import bridge_pb2
+print(bridge_pb2.__file__)
 from models import ActionRequestModel
 
 # Mapper function to convert ActionRequestModel to ActionRequest protobuf message
