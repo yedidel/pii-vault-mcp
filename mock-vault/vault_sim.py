@@ -13,8 +13,8 @@ VAULT_DID = "did:ethr:0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A"
 
 async def get_user_approval(decrypted_data):
     """
-    Simulates user interaction on a mobile/external device.
-    In a real scenario, the user would see the decrypted details on their screen.
+    Simulates user interaction via terminal.
+    Prompts the developer to authorize or decline the incoming bridge transaction.
     """
     loop = asyncio.get_event_loop()
     print(f"\n[MOCK-DECRYPTED-DATA]: {decrypted_data}")
@@ -28,26 +28,26 @@ async def run_vault():
     uri = "ws://localhost:8081/vault-websocket"
     print(f"--- Mock Vault Online | DID: {VAULT_DID} ---")
 
-    # Simulate scanning the QR code or deep link action in development
+    # SIMULATED PAIRING FLOW
     print("\n[DEVELOPMENT PAIRING SIMULATION]")
-    print("If you just got a QR code from the agent, extract the token from the link and paste it below.")
-    print("Example Link Format: vaultapp://pair?token=YOUR_UUID_TOKEN")
-    pairing_token = input("Enter pairing token (or press Enter if already paired): ").strip()
+    print("If you clicked the pairing link from Claude, the backend is already paired.")
+    print("Press Enter to continue, or paste the Pairing Token manually if needed.")
+    pairing_token = input("Enter pairing token (or press Enter if already paired via link): ").strip()
 
     async with websockets.connect(uri) as websocket:
-        # Step 1: Protocol Handshake (Enhanced with optional pairing token)
+        # Step 1: Protocol Handshake
         handshake = {
             "type": "connection_init",
             "did": VAULT_DID,
             "signature": "mock_handshake_sig"
         }
 
-        # If the user provided a token from the QR, inject it into the connection initiation event
+        # Inject the token if provided manually, otherwise proceed with standard connection
         if pairing_token:
             handshake["pairing_token"] = pairing_token
             print(f"Sending handshake with pairing token: {pairing_token}")
         else:
-            print("Sending standard handshake (assuming already paired)...")
+            print("Sending standard handshake (assuming already paired via HTTP link)...")
 
         await websocket.send(json.dumps(handshake))
 
@@ -56,6 +56,7 @@ async def run_vault():
 
             if data.get("type") == "connection_ack":
                 print("--- [MOCK-VAULT] Connection and authentication with Bridge established. ---")
+                print("Waiting for incoming payment/action requests from the agent...")
 
             elif data.get("type") == "connection_error":
                 print(f"--- [MOCK-VAULT ERROR] Connection rejected by Bridge: {data.get('message')} ---")
@@ -63,7 +64,6 @@ async def run_vault():
 
             elif data.get("type") == "payment_request":
                 # --- SIMULATED DECRYPTION ---
-                # We treat the 'data' field as an encrypted blob.
                 encrypted_blob = data.get("data")
                 decrypted_bytes = base64.b64decode(encrypted_blob)
                 decrypted_text = decrypted_bytes.decode('utf-8')
