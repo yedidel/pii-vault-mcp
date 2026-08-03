@@ -4,7 +4,13 @@ import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
 import org.springframework.scheduling.annotation.EnableScheduling
 
-@SpringBootApplication
+@SpringBootApplication(
+scanBasePackages = [
+"bridge",
+"connectors",
+"continuation"
+]
+)
 /**
  * Required to activate the background task scheduler for heartbeats.
  */

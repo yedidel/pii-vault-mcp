@@ -2,6 +2,7 @@ package bridge.model
 
 import bridge.workflow.WorkflowState
 import bridge.workflow.WorkflowStep
+import continuation.ConnectorType
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -13,7 +14,6 @@ import jakarta.persistence.Table
 import org.hibernate.annotations.JdbcTypeCode
 import org.hibernate.type.SqlTypes
 import java.time.LocalDateTime
-import bridge.transport.TransportType
 
 /**
  * Represents the internal execution state of a workflow.
@@ -32,11 +32,18 @@ class WorkflowEntity(
     @Column(name = "request_id", nullable = false, unique = true)
     val requestId: String,
 
-    @Column(name = "platform", nullable = false)
-    val platform: String,
+    /**
+     * connector used to continue the workflow.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "connector_type", nullable = false)
+    var connectorType: ConnectorType,
 
-    @Column(name = "agent_session_id", nullable = false)
-    var agentSessionId: String,
+    /**
+     * opaque data understood only by the connector.
+     */
+    @Column(name = "connector_context", nullable = false)
+    var connectorContext: String,
 
     @Enumerated(EnumType.STRING)
     @Column(name = "current_state", nullable = false)
@@ -62,10 +69,7 @@ class WorkflowEntity(
     @Column(name = "last_executed_command")
     var lastExecutedCommand: String? = null,
 
-    @Enumerated(EnumType.STRING)
-    var continuationTransport: TransportType
-
-) {
+    ) {
 
     @PrePersist
     fun onCreate() {

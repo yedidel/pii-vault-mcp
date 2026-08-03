@@ -1,20 +1,22 @@
 from fastapi import FastAPI
-import main
-import models
+from fastapi.responses import JSONResponse
 
-app=FastAPI()
+from workflow import models
+from transport.webhook_http import process_bridge_webhook
+
+# FastAPI app used in MCP_TRANSPORT=stdio
+# Exposes only Continuation Transport (Bridge webhook), not MCP.
+app = FastAPI()
+
+
 @app.get("/")
 async def root():
-    return {"message": "Adapter server running"}
-@app.post("/action/")
-async def send_action(action:models.ActionRequestModel):
-    response= main.send_action(action)
-    return {
-        "requestId": response.request_id,
-        "status": response.status,
-        "description": response.description
-    }
+    return {"message": "Adapter webhook server running"}
 
-@app.get("/status/{request_id}")
-async def getStatus(request_id: str):
-    return main.get_status(request_id)
+
+@app.post("/webhook/bridge")
+async def bridge_webhook(
+        notification: models.ContinuationNotification,
+):
+    body, status_code = process_bridge_webhook(notification)
+    return JSONResponse(content=body, status_code=status_code)

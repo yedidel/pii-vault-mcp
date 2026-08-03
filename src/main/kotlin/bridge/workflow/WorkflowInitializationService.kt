@@ -1,90 +1,94 @@
 package bridge.workflow
+
 import bridge.model.WorkflowEntity
 import bridge.repository.WorkflowRepository
-import bridge.transport.TransportType
 import bridge.workflow.events.ActionContext
 import bridge.workflow.events.ActionCreatedEvent
 import bridge.workflow.publisher.WorkflowEventPublisher
+import com.fasterxml.jackson.databind.ObjectMapper
+import continuation.ConnectorType
 import org.springframework.stereotype.Service
 import java.util.UUID
-import com.fasterxml.jackson.databind.ObjectMapper
-
 
 /**
  * Initializes workflows and triggers the workflow engine.
  *
  * Responsibility:
- * - Create a Workflow entity for a new action
- * - Publish ActionCreatedEvent to Kafka so the workflow engine can start processing
+ * - Create a workflow entity for a new action
+ * - Publish ActionCreatedEvent so the workflow engine can start processing
  */
 @Service
 class WorkflowInitializationService(
 
     private val workflowRepository: WorkflowRepository,
-    private val workflowEventPublisher: WorkflowEventPublisher,
-    private val objectMapper: ObjectMapper
 
-) {
+    private val workflowEventPublisher: WorkflowEventPublisher,
+
+    private val objectMapper: ObjectMapper,
+
+    ) {
 
     /**
-     * Create a workflow for an incoming action and publish the initial event.
-     *
-     * @param requestId The action request ID
-     * @param agentId The agent ID
-     * @param userInstallId The user installation ID
-     * @param actionType The action type
-     * @param platform The platform (e.g., "claude", "openai")
-     * @param sessionId The agent session ID
-     * @param parameters The action parameters
-     * @return The created WorkflowEntity
+     * Create a workflow for an incoming action.
      */
     fun initializeWorkflow(
+
         requestId: String,
+
         agentId: String,
+
         userInstallId: String,
+
         actionType: String,
-        platform: String,
-        sessionId: String,
-        parameters: Map<String, String>
-    ): WorkflowEntity {
-        // Build action context
+
+        connectorType: ConnectorType,
+
+        connectorContext: String,
+
+        parameters: Map<String, String>,
+
+        ): WorkflowEntity {
+
         val actionContext = ActionContext(
             agentId = agentId,
             userInstallId = userInstallId,
             actionType = actionType,
-            platform = platform,
-            sessionId = sessionId,
-            parameters = parameters
+            connectorType = connectorType,
+            connectorContext = connectorContext,
+            parameters = parameters,
         )
 
-        val workflowId = UUID.randomUUID().toString()
-        val contextJson = objectMapper.writeValueAsString(actionContext)
-        // Create the workflow entity
+        val workflowId =
+            UUID.randomUUID().toString()
+
+        val contextJson =
+            objectMapper.writeValueAsString(actionContext)
+
         val workflow = WorkflowEntity(
             workflowId = workflowId,
             requestId = requestId,
-            platform = platform,
-            agentSessionId = sessionId,
+            connectorType = connectorType,
+            connectorContext = connectorContext,
             currentState = WorkflowState.RECEIVED,
             currentStep = WorkflowStep.ACTION_RECEIVED,
             contextJson = contextJson,
-            continuationTransport = TransportType.POLLING
         )
 
-        val savedWorkflow = workflowRepository.save(workflow)
+        val savedWorkflow =
+            workflowRepository.save(workflow)
 
-        // Publish ActionCreatedEvent to Kafka
-        val event = ActionCreatedEvent(
-            workflowId = workflowId,
-            requestId = requestId,
-            context = actionContext
+        workflowEventPublisher.publish(
+            ActionCreatedEvent(
+                workflowId = workflowId,
+                requestId = requestId,
+                context = actionContext,
+            )
         )
 
-        workflowEventPublisher.publish(event)
-
-        println("--- [WORKFLOW] Workflow initialized: $workflowId for request: $requestId ---")
+        println(
+            "--- [workflow] initialized workflow=$workflowId request=$requestId ---"
+        )
 
         return savedWorkflow
     }
 }
-

@@ -1,8 +1,7 @@
 import grpc
-import bridge_pb2
-from models import ActionRequestModel
+from bridge import bridge_pb2, bridge_pb2_grpc
+from workflow.models import ActionRequestModel
 from mapper import map_to_proto
-import bridge_pb2_grpc
 
 # create a gRPC channel to communicate with the Bridge server.
 # currently the channel is insecure and connects to localhost:50051.
@@ -25,6 +24,7 @@ def send_action(action_request: ActionRequestModel):
 
     return {
         "requestId": response.request_id,
+        "workflowId": response.workflow_id,
         "status": bridge_pb2.StatusType.Name(response.status),
         "description": response.description
     }
@@ -39,7 +39,7 @@ def get_status(request_id: str):
         raise Exception(f"gRPC error: {e.details()}")
 
     # convert protobuf enum to readable string
-    status_name=bridge_pb2.StatusType.Name(response.status)
+    status_name= bridge_pb2.StatusType.Name(response.status)
     return {
         "requestId": response.request_id,
         "status": status_name,

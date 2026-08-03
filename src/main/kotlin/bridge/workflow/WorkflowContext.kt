@@ -1,5 +1,5 @@
 package bridge.workflow
-import bridge.transport.TransportType
+
 import bridge.workflow.events.ActionContext
 
 /**
@@ -19,6 +19,4 @@ data class WorkflowContext(
     var currentState: WorkflowState,
 
     var currentStep: WorkflowStep,
-
-    val continuationTransport: TransportType
 )

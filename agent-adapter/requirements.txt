@@ -4,3 +4,5 @@ protobuf # Protocol Buffers
 fastapi # FastAPI framework for building APIs for the agent adapter
 uvicorn # http server for running the FastAPI application
 mcp # MCP library for communication with the MCP server
+google-genai # Gemini Interactions API (Google AI Studio / Gemini API)
+requests # ClaudeProvider HTTP POST to Channel ingress

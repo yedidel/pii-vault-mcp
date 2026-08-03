@@ -1,0 +1,41 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "name": "bridge-interaction-session-start",
+            "type": "command",
+            "command": "node ${extensionPath}/scripts/session-start.js",
+            "description": "Create and persist a Gemini Interaction for this CLI session."
+          }
+        ]
+      }
+    ],
+    "BeforeTool": [
+      {
+        "matcher": "mcp_.*_send_action",
+        "hooks": [
+          {
+            "name": "bridge-interaction-before-send-action",
+            "type": "command",
+            "command": "node ${extensionPath}/scripts/before-send-action.js",
+            "description": "Inject interaction.id as sessionId when missing."
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "name": "bridge-interaction-session-end",
+            "type": "command",
+            "command": "node ${extensionPath}/scripts/session-end.js",
+            "description": "Drop the CLI session_id → interaction.id mapping."
+          }
+        ]
+      }
+    ]
+  }
+}

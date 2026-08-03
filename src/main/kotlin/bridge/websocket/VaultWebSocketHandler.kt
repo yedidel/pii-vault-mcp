@@ -1,4 +1,5 @@
 package bridge.websocket
+
 import bridge.repository.ActionRepository
 import bridge.repository.WorkflowRepository
 import bridge.workflow.events.ActionContext
@@ -25,7 +26,6 @@ class VaultWebSocketHandler(
 
 ) : TextWebSocketHandler() {
 
-
     private var vaultSession: WebSocketSession? = null
 
     override fun handleTextMessage(
@@ -46,10 +46,14 @@ class VaultWebSocketHandler(
 
             "action_approved" -> {
                 println("--- [BRIDGE] Vault approved request: $requestId ---")
+
                 publishVaultResponseEvent(
                     requestId = requestId,
                     responseStatus = "APPROVED",
-                    resultData = payload.optString("result_data", "Vault approved action")
+                    resultData = payload.optString(
+                        "result_data",
+                        "Vault approved action"
+                    )
                 )
             }
 
@@ -59,7 +63,10 @@ class VaultWebSocketHandler(
                 publishVaultResponseEvent(
                     requestId = requestId,
                     responseStatus = "REJECTED",
-                    resultData = payload.optString("reason", "Vault rejected action")
+                    resultData = payload.optString(
+                        "reason",
+                        "Vault rejected action"
+                    )
                 )
             }
         }
@@ -71,6 +78,7 @@ class VaultWebSocketHandler(
         requestId: String
     ) {
         if (vaultSession == null || !vaultSession!!.isOpen) {
+
             println("--- [ERROR] No active Vault connection ---")
 
             publishVaultResponseEvent(
@@ -103,6 +111,7 @@ class VaultWebSocketHandler(
         responseStatus: String,
         resultData: String?
     ) {
+
         val workflow = workflowRepository.findByRequestId(requestId)
 
         if (workflow == null) {
@@ -131,9 +140,9 @@ class VaultWebSocketHandler(
             agentId = action.agentId,
             userInstallId = action.userInstallId,
             actionType = action.actionType,
-            platform = workflow.platform,
-            sessionId = workflow.agentSessionId,
-            parameters = parameters
+            connectorType = workflow.connectorType,
+            connectorContext = workflow.connectorContext,
+            parameters = parameters,
         )
 
         workflowEventPublisher.publish(
@@ -142,7 +151,7 @@ class VaultWebSocketHandler(
                 requestId = requestId,
                 responseStatus = responseStatus,
                 resultData = resultData,
-                context = context
+                context = context,
             )
         )
     }

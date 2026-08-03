@@ -3,9 +3,10 @@ package bridge.workflow
 import bridge.ActionService
 import bridge.integration.GuardianGateway
 import bridge.integration.VaultGateway
-import bridge.transport.AgentTransportRegistry
 import bridge.workflow.publisher.WorkflowEventPublisher
 import bridge.workflow.state.WorkflowTransitionService
+import continuation.ContinuationRequest
+import continuation.WorkflowContinuationService
 import org.springframework.stereotype.Component
 
 @Component
@@ -19,25 +20,39 @@ class WorkflowCommandExecutor(
 
     private val workflowEventPublisher: WorkflowEventPublisher,
 
-    private val transportRegistry: AgentTransportRegistry,
+    private val workflowContinuationService: WorkflowContinuationService,
 
-    private val actionService: ActionService
+    private val actionService: ActionService,
 
-) {
-    fun execute(context: WorkflowContext, decision: WorkflowDecision){
-        decision.commands.forEach {execute(context, it) }
+    ) {
+
+    fun execute(
+        context: WorkflowContext,
+        decision: WorkflowDecision,
+    ) {
+        decision.commands.forEach {
+            println("Executing command: ${it::class.simpleName}")
+            execute(context, it)
+        }
     }
 
-    private fun execute(context: WorkflowContext,command: WorkflowCommand) {
+    private fun execute(
+        context: WorkflowContext,
+        command: WorkflowCommand,
+    ) {
 
         when (command) {
 
             is TransitionCommand -> {
-                transitionService.transition(
+                val updated = transitionService.transition(
                     workflowId = command.workflowId,
                     nextState = command.nextState,
-                    nextStep = command.nextStep
+                    nextStep = command.nextStep,
                 )
+                // Keep the in-memory context aligned so later commands in
+                // the same decision (e.g. NotifyAgent) see the new state.
+                context.currentState = updated.currentState
+                context.currentStep = updated.currentStep
             }
 
             is PublishEventCommand -> {
@@ -48,7 +63,7 @@ class WorkflowCommandExecutor(
                 guardianGateway.verifyAgent(
                     workflowId = command.workflowId,
                     requestId = command.requestId,
-                    context = command.context
+                    context = command.context,
                 )
             }
 
@@ -57,16 +72,23 @@ class WorkflowCommandExecutor(
                     workflowId = command.workflowId,
                     requestId = command.requestId,
                     amount = command.amount,
-                    currency = command.currency
+                    currency = command.currency,
                 )
             }
 
             is NotifyAgentCommand -> {
-                transportRegistry.send(
-                    transport = context.continuationTransport,
-                    requestId = command.requestId,
-                    message = command.message
 
+                val request = ContinuationRequest(
+                    workflowId = context.workflowId,
+                    requestId = command.requestId,
+                    connectorContext = context.actionContext.connectorContext,
+                    status = context.currentState.name,
+                    message = command.message,
+                )
+
+                workflowContinuationService.continueWorkflow(
+                    connectorType = context.actionContext.connectorType,
+                    request = request,
                 )
             }
 
@@ -74,7 +96,7 @@ class WorkflowCommandExecutor(
                 actionService.updateActionStatus(
                     requestId = command.requestId,
                     finalStatus = command.status,
-                    resultData = command.resultData
+                    resultData = command.resultData,
                 )
             }
         }
