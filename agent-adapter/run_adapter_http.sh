@@ -12,8 +12,14 @@ export CONNECTOR_TYPE="${CONNECTOR_TYPE:-WEBHOOK}"
 export CONNECTOR_CONTEXT="${CONNECTOR_CONTEXT:-http://localhost:8000/webhook/bridge}"
 export GEMINI_MODEL="${GEMINI_MODEL:-gemini-3.6-flash}"
 
-if [[ -z "${GEMINI_API_KEY:-}" && -z "${GOOGLE_API_KEY:-}" ]]; then
-  echo "Set GEMINI_API_KEY or GOOGLE_API_KEY before starting the Adapter." >&2
+if [[ \
+  -z "${GEMINI_API_KEY:-}" && \
+  -z "${GOOGLE_API_KEY:-}" && \
+  -z "${OPENAI_API_KEY:-}" \
+]]; then
+  echo "Set one of the following before starting the Adapter:" >&2
+  echo "  GEMINI_API_KEY or GOOGLE_API_KEY" >&2
+  echo "  OPENAI_API_KEY" >&2
   exit 1
 fi
 

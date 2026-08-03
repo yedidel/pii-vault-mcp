@@ -17,7 +17,12 @@ class ContinuationProvider:
 class DefaultContinuationProvider(ContinuationProvider):
 
     def resolve(self):
+        # OpenAI / Claude async wake requires WEBHOOK back to the Adapter.
+        # POLLING remains available by setting CONNECTOR_TYPE=POLLING.
         return ContinuationTarget(
-            connector_type=os.getenv("CONNECTOR_TYPE", "POLLING"),
-            connector_context=os.getenv("CONNECTOR_CONTEXT", "")
+            connector_type=os.getenv("CONNECTOR_TYPE", "WEBHOOK"),
+            connector_context=os.getenv(
+                "CONNECTOR_CONTEXT",
+                "http://127.0.0.1:8000/webhook/bridge",
+            ),
         )

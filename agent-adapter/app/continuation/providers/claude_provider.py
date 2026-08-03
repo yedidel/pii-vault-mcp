@@ -1,7 +1,11 @@
 import requests
 
 from continuation.wake_provider import WakeProvider
+from logutil import get_logger
 from workflow.models import ContinuationNotification, WorkflowModel
+
+
+logger = get_logger(__name__)
 
 
 class ClaudeProvider(WakeProvider):
@@ -54,8 +58,8 @@ class ClaudeProvider(WakeProvider):
                 f"requestId={notification.requestId}: {error}"
             ) from error
 
-        print(
-            "Woke Claude agent "
-            f"requestId={notification.requestId} "
-            f"channel={ingress}"
+        logger.info(
+            "Woke Claude agent requestId=%s channel=%s",
+            notification.requestId,
+            ingress,
         )

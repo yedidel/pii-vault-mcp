@@ -2,10 +2,13 @@ package bridge
 
 import bridge.Bridge.ActionResponse
 import bridge.Bridge.StatusResponse
+import bridge.mapper.toConnectorType
+import bridge.repository.WorkflowRepository
 import bridge.workflow.WorkflowInitializationService
 import com.fasterxml.jackson.databind.ObjectMapper
+import io.grpc.Status
 import org.springframework.stereotype.Service
-import bridge.mapper.toConnectorType
+
 /**
  * BridgeServiceImpl
  *
@@ -18,6 +21,8 @@ class BridgeServiceImpl(
     private val actionService: ActionService,
 
     private val workflowInitializationService: WorkflowInitializationService,
+
+    private val workflowRepository: WorkflowRepository,
 
     private val objectMapper: ObjectMapper,
 
@@ -48,13 +53,35 @@ class BridgeServiceImpl(
                     .build()
             }
 
+        // Idempotent SendAction: ActionService may reuse a recent identical
+        // action. Never create a second workflow for the same request_id
+        // (workflows.request_id is unique).
+        val existingWorkflow =
+            workflowRepository.findByRequestId(responseEntity.requestId)
+        if (existingWorkflow != null) {
+            println(
+                "--- [BRIDGE] Reusing existing workflow " +
+                    "${existingWorkflow.workflowId} for request " +
+                    "${responseEntity.requestId} ---"
+            )
+            return ActionResponse.newBuilder()
+                .setRequestId(responseEntity.requestId)
+                .setWorkflowId(existingWorkflow.workflowId)
+                .setStatus(responseEntity.status)
+                .setDescription(
+                    responseEntity.description.ifBlank {
+                        "Duplicate request detected; returning existing workflow."
+                    }
+                )
+                .build()
+        }
+
         val parameters =
             objectMapper.convertValue(
                 request.parametersMap,
                 Map::class.java,
             ) as Map<String, String>
 
-        println("Reached initializeWorkflow")
         val workflow = try {
             workflowInitializationService.initializeWorkflow(
                 requestId = responseEntity.requestId,
@@ -68,7 +95,12 @@ class BridgeServiceImpl(
         } catch (e: Exception) {
             println("========== WORKFLOW INIT FAILED ==========")
             e.printStackTrace()
-            throw e
+            throw Status.INTERNAL
+                .withDescription(
+                    "Workflow initialization failed: ${e.message ?: e.javaClass.simpleName}"
+                )
+                .withCause(e)
+                .asRuntimeException()
         }
 
         return ActionResponse.newBuilder()

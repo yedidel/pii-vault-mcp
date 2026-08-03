@@ -3,6 +3,7 @@ import os
 
 import uvicorn
 
+from logutil import configure_logging, get_logger
 from mcp_server import mcp
 from server import app
 
@@ -12,6 +13,8 @@ from server import app
 MCP_TRANSPORT = os.getenv("MCP_TRANSPORT", "stdio").lower()
 ADAPTER_HOST = os.getenv("ADAPTER_HOST", "0.0.0.0")
 ADAPTER_PORT = int(os.getenv("ADAPTER_PORT", "8000"))
+
+logger = get_logger(__name__)
 
 
 async def run_webhook_server():
@@ -44,16 +47,19 @@ async def run_mcp_stdio():
 
 
 async def run_adapter():
-    # Log to stderr so STDIO MCP protocol on stdout stays clean.
-    import sys
+    configure_logging()
 
     if MCP_TRANSPORT == "stdio":
         # LLM <-> Adapter: STDIO
         # Bridge <-> Adapter: HTTP POST /webhook/bridge
-        print(
-            f"Starting Adapter: MCP_TRANSPORT=stdio, "
-            f"webhook on http://{ADAPTER_HOST}:{ADAPTER_PORT}/webhook/bridge",
-            file=sys.stderr,
+        logger.info(
+            "Starting Adapter: MCP_TRANSPORT=stdio, "
+            "webhook on http://%s:%s/webhook/bridge, "
+            "events on http://%s:%s/events",
+            ADAPTER_HOST,
+            ADAPTER_PORT,
+            ADAPTER_HOST,
+            ADAPTER_PORT,
         )
         await asyncio.gather(
             run_mcp_stdio(),
@@ -64,11 +70,17 @@ async def run_adapter():
     if MCP_TRANSPORT == "http":
         # LLM <-> Adapter: Streamable HTTP /mcp
         # Bridge <-> Adapter: HTTP POST /webhook/bridge (same server)
-        print(
-            f"Starting Adapter: MCP_TRANSPORT=http, "
-            f"MCP on http://{ADAPTER_HOST}:{ADAPTER_PORT}/mcp, "
-            f"webhook on http://{ADAPTER_HOST}:{ADAPTER_PORT}/webhook/bridge",
-            file=sys.stderr,
+        logger.info(
+            "Starting Adapter: MCP_TRANSPORT=http, "
+            "MCP on http://%s:%s/mcp, "
+            "webhook on http://%s:%s/webhook/bridge, "
+            "events on http://%s:%s/events",
+            ADAPTER_HOST,
+            ADAPTER_PORT,
+            ADAPTER_HOST,
+            ADAPTER_PORT,
+            ADAPTER_HOST,
+            ADAPTER_PORT,
         )
         await run_mcp_http_server()
         return

@@ -1,6 +1,10 @@
 from continuation.wake_dispatcher import WakeDispatcher
+from logutil import get_logger
 from workflow.models import ContinuationNotification
 from workflow.workflow_service import WorkflowService
+
+
+logger = get_logger(__name__)
 
 
 class ContinuationService:
@@ -24,9 +28,9 @@ class ContinuationService:
         )
 
         if workflow is None:
-            print(
-                "No pending workflow found for request: "
-                f"{notification.requestId}"
+            logger.warning(
+                "No pending workflow found for request: %s",
+                notification.requestId,
             )
             return False
 
@@ -44,10 +48,9 @@ class ContinuationService:
             self.workflow_service.remove_workflow(
                 notification.requestId
             )
-
-            print(
-                "Removed completed workflow: "
-                f"{notification.requestId}"
+            logger.info(
+                "Removed completed workflow: %s",
+                notification.requestId,
             )
 
         return True

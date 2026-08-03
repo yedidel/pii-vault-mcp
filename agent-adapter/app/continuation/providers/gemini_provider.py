@@ -3,8 +3,11 @@ import os
 from google import genai
 
 from continuation.wake_provider import WakeProvider
+from logutil import get_logger
 from workflow.models import ContinuationNotification, WorkflowModel
 
+
+logger = get_logger(__name__)
 
 # model is wake layer config only bridge stay unaware.
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
@@ -49,18 +52,11 @@ class GeminiProvider(WakeProvider):
                 previous_interaction_id=previous_interaction_id,
                 input=message,
             )
-
-            fetched = client.interactions.get(
-                interaction.id,
-                include_input=True,
-            )
-
-            print("FETCHED INTERACTION")
-            print(fetched.model_dump_json(indent=2))
-
         except Exception as error:
-            print(
-                f"Gemini wake failed requestId={notification.requestId}: {error}"
+            logger.error(
+                "Gemini wake failed requestId=%s: %s",
+                notification.requestId,
+                error,
             )
             raise
 
@@ -71,9 +67,9 @@ class GeminiProvider(WakeProvider):
             interaction.id,
         )
 
-        print(
-            "Woke Gemini agent "
-            f"requestId={notification.requestId} "
-            f"previous={previous_interaction_id} "
-            f"new={interaction.id}"
+        logger.info(
+            "Woke Gemini agent requestId=%s previous=%s new=%s",
+            notification.requestId,
+            previous_interaction_id,
+            interaction.id,
         )

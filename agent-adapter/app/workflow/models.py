@@ -35,7 +35,8 @@ class WorkflowModel(BaseModel):
 
     # platform continuation context
     # Gemini: interaction.id
-    # Claude: Channel ingress URL (http://127.0.0.1:<port>/wake)
+    # Claude: Adapter continuation URL (http://127.0.0.1:8000/continuation/<session-id>)
+    # OpenAI: conversation.id (conv_...)
     continuationContext: str
 
     # current workflow status

@@ -19,8 +19,11 @@ def send_action(action_request: ActionRequestModel):
     # Send the action request to the Bridge server and get the response
     try:
         response = stub.SendAction(proto_request)
-    except grpc.RpcError as e:
-        raise Exception(f"gRPC error: ",e)
+    except grpc.RpcError as error:
+        details = error.details() or ""
+        raise RuntimeError(
+            f"gRPC error code={error.code().name} details={details!r}"
+        ) from error
 
     return {
         "requestId": response.request_id,

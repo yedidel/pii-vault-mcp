@@ -2,18 +2,26 @@ import json
 import os
 import time
 from pathlib import Path
+from typing import Annotated
 from urllib.parse import urlparse
-
 import requests
 from mcp.server.fastmcp import FastMCP
+from pydantic import Field
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
-
 import main
-from workflow import models
 from continuation.continuation_provider import DefaultContinuationProvider
+from logutil import get_logger
+from transport.client_events_http import handle_client_events
 from transport.webhook_http import process_bridge_webhook
-from workflow.workflow_context import claude_session_registry, workflow_service
+from workflow import models
+from workflow.workflow_context import (
+    claude_session_registry,
+    client_notifier,
+    workflow_service,
+)
+
+logger = get_logger(__name__)
 
 
 BASE_DIR = Path(__file__).parent
@@ -66,6 +74,12 @@ async def bridge_webhook_route(request: Request) -> Response:
     return JSONResponse(body, status_code=status_code)
 
 
+@mcp.custom_route("/events", methods=["GET"])
+async def client_events_route(request: Request) -> Response:
+    # Client notification SSE: ?platform=...&sessionId=...
+    return await handle_client_events(request, client_notifier)
+
+
 @mcp.custom_route("/continuation/register", methods=["POST"])
 async def register_claude_session(request: Request) -> Response:
     payload = await request.json()
@@ -87,9 +101,9 @@ async def register_claude_session(request: Request) -> Response:
         f"{ADAPTER_PUBLIC_BASE}/continuation/{session.session_id}"
     )
 
-    print(
-        "Registered Claude session "
-        f"sessionId={session.session_id} ingress={session.ingress_url}"
+    logger.info(
+        "Registered Claude session sessionId=%s",
+        session.session_id,
     )
 
     return JSONResponse(
@@ -111,7 +125,7 @@ async def unregister_claude_session(request: Request) -> Response:
             status_code=404,
         )
 
-    print(f"Unregistered Claude session sessionId={session_id}")
+    logger.info("Unregistered Claude session sessionId=%s", session_id)
     return JSONResponse({"status": "ok", "sessionId": session_id})
 
 
@@ -176,52 +190,125 @@ async def health_route(_request: Request) -> Response:
     Send an action request to the Bridge system.
     
     Required parameters:
-    
+
     platform:
     - "gemini"
     - "claude"
-    
-    sessionId:
-    - Gemini: the current Interactions API interaction.id.
-    - Claude: the Adapter continuation URL for this session,
-      returned by the bridge-wake channel tool get_continuation_context,
-      for example: http://127.0.0.1:8000/continuation/<session-id>
-    
+    - "openai"
+
+    sessionId (client-bootstrapped continuation context):
+    - Claude: continuation URL
+    - Gemini: interaction.id
+    - OpenAI: conversation.id
+
     Allowed action types:
     - PAYMENT
     - TRANSACTION
     - FILL_FORM
+    
+    parameters examples:
+    
+    PAYMENT:
+    {
+      "amount": "100",
+      "currency": "ILS"
+    }
+    
+    FILL_FORM:
+    {
+      "id": "...",
+      "name": "...",
+      "email": "...",
+      "password": "..."
+    }
+    
+    TRANSACTION:
+    {
+      "transactionId": "...",
+      "account": "..."
+    }
 """
 )
 def send_action(
         agentId: str,
         actionType: str,
-        parameters: dict[str, str],
+        parameters: Annotated[
+            dict[str, str],
+            Field(
+                description=(
+                    "Action-specific string key/value pairs. "
+                    "PAYMENT requires amount and currency. "
+                    "Do not send an empty object when values were provided."
+                ),
+                json_schema_extra={
+                    "properties": {
+                        "amount": {
+                            "type": "string",
+                            "description": "Payment amount, e.g. \"100\".",
+                        },
+                        "currency": {
+                            "type": "string",
+                            "description": "ISO currency code, e.g. \"ILS\".",
+                        },
+                        "id": {"type": "string"},
+                        "name": {"type": "string"},
+                        "email": {"type": "string"},
+                        "password": {"type": "string"},
+                        "transactionId": {"type": "string"},
+                        "account": {"type": "string"},
+                    },
+                    "additionalProperties": {"type": "string"},
+                },
+            ),
+        ],
         sessionId: str,
         platform: str,
 ):
-    # TEMP POC logging — verify BeforeTool rewrite reaches the Adapter.
-    print(
-        f"[send_action POC] received sessionId={sessionId!r} "
-        f"platform={platform!r} agentId={agentId!r} actionType={actionType!r}"
+    logger.info(
+        "send_action platform=%s actionType=%s agentId=%s",
+        platform,
+        actionType,
+        agentId,
     )
 
     try:
+        action_type = (actionType or "").strip().upper()
+        params = {
+            str(key): "" if value is None else str(value)
+            for key, value in (parameters or {}).items()
+        }
+
+        if action_type == "PAYMENT":
+            missing = [
+                key for key in ("amount", "currency")
+                if not str(params.get(key) or "").strip()
+            ]
+            if missing:
+                return {
+                    "error": (
+                        "PAYMENT requires non-empty parameters.amount and "
+                        "parameters.currency. "
+                        f"Missing: {', '.join(missing)}. "
+                        "Retry send_action with "
+                        'parameters={"amount":"...","currency":"..."}.'
+                    ),
+                }
+
         continuation_target = continuation_provider.resolve()
 
         action_request = models.ActionRequestModel(
             agentId=agentId,
             userInstallId=USER_INSTALL_ID,
             actionType=actionType,
-            parameters=parameters,
+            parameters=params,
             connectorType=continuation_target.connector_type,
             connectorContext=continuation_target.connector_context,
             platform=platform,
             sessionId=sessionId,
         )
 
-        # sessionId is Adapter-local wake context (Gemini interaction.id or
-        # Claude continuation URL). connectorContext is what Bridge POSTs to.
+        # sessionId is opaque client-supplied wake context.
+        # connectorContext is what Bridge POSTs to.
         workflow = workflow_service.create_workflow(
             action_request=action_request,
             platform=platform,
@@ -233,8 +320,6 @@ def send_action(
             "requestId": workflow.requestId,
             "status": workflow.currentStatus,
             "description": workflow.description,
-            # TEMP POC echo — makes the received sessionId visible in tool result.
-            "pocReceivedSessionId": sessionId,
         }
 
     except Exception as error:

@@ -1,5 +1,9 @@
 import main
+from logutil import get_logger
 from workflow.models import ActionRequestModel, WorkflowModel
+
+
+logger = get_logger(__name__)
 
 
 class WorkflowService:
@@ -35,7 +39,7 @@ class WorkflowService:
         )
 
         self.pending_workflows[workflow.requestId] = workflow
-        print(f"Saved pending workflow: {workflow.requestId}")
+        logger.info("Saved pending workflow: %s", workflow.requestId)
 
         return workflow
 
