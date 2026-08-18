@@ -1,6 +1,5 @@
 package connectors.webhook
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.http.MediaType
 import org.springframework.http.client.JdkClientHttpRequestFactory
 import org.springframework.stereotype.Service
@@ -8,9 +7,8 @@ import org.springframework.web.client.RestClient
 import java.net.http.HttpClient
 
 @Service
-class WebhookTransport(
-    private val objectMapper: ObjectMapper
-) {
+class WebhookTransport {
+
     private val client = RestClient.builder()
         .requestFactory(
             JdkClientHttpRequestFactory(
@@ -20,22 +18,15 @@ class WebhookTransport(
             )
         )
         .build()
+    fun send(
+        callbackUrl: String,
+        notification: WebhookNotification,
+    ) {
 
-    fun send(callbackUrl: String, notification: WebhookNotification) {
-        val bodyJson = objectMapper.writeValueAsString(notification)
-        var request = client.post()
+        client.post()
             .uri(callbackUrl)
             .contentType(MediaType.APPLICATION_JSON)
-
-        WebhookSignature.secretFromEnv().let { secret ->
-            request = request.header(
-                WebhookSignature.HEADER_NAME,
-                WebhookSignature.sign(bodyJson, secret),
-            )
-        }
-
-        request
-            .body(bodyJson)
+            .body(notification)
             .retrieve()
             .toBodilessEntity()
     }
