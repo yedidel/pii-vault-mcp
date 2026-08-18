@@ -13,7 +13,7 @@ import main
 from continuation.continuation_provider import DefaultContinuationProvider
 from logutil import get_logger
 from transport.client_events_http import handle_client_events
-from transport.webhook_http import process_bridge_webhook
+from transport.webhook_http import handle_bridge_webhook_request
 from workflow import models
 from workflow.workflow_context import (
     claude_session_registry,
@@ -67,10 +67,7 @@ def _is_local_ingress(url: str) -> bool:
 
 @mcp.custom_route("/webhook/bridge", methods=["POST"])
 async def bridge_webhook_route(request: Request) -> Response:
-    # Continuation Transport endpoint on the MCP HTTP server
-    payload = await request.json()
-    notification = models.ContinuationNotification(**payload)
-    body, status_code = process_bridge_webhook(notification)
+    body, status_code = await handle_bridge_webhook_request(request)
     return JSONResponse(body, status_code=status_code)
 
 
