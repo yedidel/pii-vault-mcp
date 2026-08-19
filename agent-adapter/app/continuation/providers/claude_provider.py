@@ -1,5 +1,5 @@
 import requests
-
+from continuation.claude_url_allowlist import is_allowed_claude_wake_url
 from continuation.wake_provider import WakeProvider
 from logutil import get_logger
 from workflow.models import ContinuationNotification, WorkflowModel
@@ -34,6 +34,10 @@ class ClaudeProvider(WakeProvider):
             raise ValueError(
                 "Missing continuationContext "
                 "(Claude continuation URL)."
+            )
+        if not is_allowed_claude_wake_url(ingress):
+            raise ValueError(
+                f"Claude wake URL is not allowed: {ingress!r}"
             )
 
         payload = {

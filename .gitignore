@@ -61,7 +61,7 @@ build/
 ### Python IDE ###
 .idea/
 .vscode/
-
+.mcp.json
 ### macOS Python cache ###
 .DS_Store
 .idea/

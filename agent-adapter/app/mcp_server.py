@@ -1,6 +1,7 @@
 import json
 import os
 import time
+from continuation.claude_url_allowlist import is_allowed_claude_wake_url
 from pathlib import Path
 from typing import Annotated
 from urllib.parse import urlparse
@@ -267,6 +268,15 @@ def send_action(
         actionType,
         agentId,
     )
+    if (platform or "").strip().lower() == "claude":
+        if not is_allowed_claude_wake_url(sessionId):
+            return {
+                "error": (
+                    "Invalid Claude sessionId URL. "
+                    "Use continuationUrl from get_continuation_context "
+                    "or http://127.0.0.1:<port>/wake"
+                ),
+            }
 
     try:
         action_type = (actionType or "").strip().upper()
