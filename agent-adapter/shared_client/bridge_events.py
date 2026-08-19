@@ -14,6 +14,20 @@ from urllib.parse import urlencode
 
 import httpx
 
+import importlib.util
+from pathlib import Path
+
+_AUTH_FILE = Path(__file__).resolve().parent / "auth.py"
+_AUTH_SPEC = importlib.util.spec_from_file_location(
+    "shared_client_auth",
+    _AUTH_FILE,
+)
+if _AUTH_SPEC is None or _AUTH_SPEC.loader is None:
+    raise ImportError(f"Cannot load auth from {_AUTH_FILE}")
+_AUTH_MOD = importlib.util.module_from_spec(_AUTH_SPEC)
+_AUTH_SPEC.loader.exec_module(_AUTH_MOD)
+get_auth_headers = _AUTH_MOD.get_auth_headers
+
 
 OnEvent = Callable[[dict[str, Any]], Awaitable[None] | None]
 
@@ -43,7 +57,10 @@ async def subscribe_client_events(
         async with client.stream(
                 "GET",
                 url,
-                headers={"Accept": "text/event-stream"},
+                headers={
+                    "Accept": "text/event-stream",
+                    **get_auth_headers(),
+                },
         ) as response:
             response.raise_for_status()
 

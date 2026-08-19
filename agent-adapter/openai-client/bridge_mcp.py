@@ -13,13 +13,27 @@ often cause models to emit parameters={} or flatten keys to the top level.
 from __future__ import annotations
 
 import copy
+import importlib.util
 import json
 import os
+from pathlib import Path
 from typing import Any
-
+import httpx
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 
+_SHARED_AUTH = (
+        Path(__file__).resolve().parent.parent / "shared_client" / "auth.py"
+)
+_AUTH_SPEC = importlib.util.spec_from_file_location(
+    "shared_client_auth",
+    _SHARED_AUTH,
+)
+if _AUTH_SPEC is None or _AUTH_SPEC.loader is None:
+    raise ImportError(f"Cannot load shared auth from {_SHARED_AUTH}")
+_AUTH_MOD = importlib.util.module_from_spec(_AUTH_SPEC)
+_AUTH_SPEC.loader.exec_module(_AUTH_MOD)
+get_auth_headers = _AUTH_MOD.get_auth_headers
 
 DEFAULT_MCP_URL = os.getenv(
     "BRIDGE_MCP_URL",
@@ -240,6 +254,7 @@ class BridgeMcpClient:
         self._session: ClientSession | None = None
         self._transport_cm = None
         self._session_cm = None
+        self._http_client: httpx.AsyncClient | None = None
         self._openai_tools: list[dict[str, Any]] = []
 
     @property
@@ -254,9 +269,18 @@ class BridgeMcpClient:
         await self.close()
 
     async def connect(self) -> None:
-        self._transport_cm = streamable_http_client(self.mcp_url)
+        self._http_client = httpx.AsyncClient(
+            headers=get_auth_headers(),
+            follow_redirects=True,
+            timeout=httpx.Timeout(30.0, read=300.0),
+        )
+        await self._http_client.__aenter__()
+
+        self._transport_cm = streamable_http_client(
+            self.mcp_url,
+            http_client=self._http_client,
+        )
         streams = await self._transport_cm.__aenter__()
-        # Newer MCP SDKs yield (read, write); older ones also return get_session_id.
         read_stream = streams[0]
         write_stream = streams[1]
 
@@ -277,6 +301,10 @@ class BridgeMcpClient:
             await self._transport_cm.__aexit__(None, None, None)
             self._transport_cm = None
 
+        if self._http_client is not None:
+            await self._http_client.__aexit__(None, None, None)
+            self._http_client = None
+
     def _prepare_arguments(
             self,
             name: str,
@@ -292,9 +320,9 @@ class BridgeMcpClient:
 
             # Prefer a real agent id over model placeholders like "..." or blanks.
             default_agent_id = (
-                os.getenv("BRIDGE_AGENT_ID")
-                or os.getenv("OPENAI_BRIDGE_AGENT_ID")
-                or "agent-123"
+                    os.getenv("BRIDGE_AGENT_ID")
+                    or os.getenv("OPENAI_BRIDGE_AGENT_ID")
+                    or "agent-123"
             ).strip()
             agent_id = str(args.get("agentId") or "").strip()
             if (not agent_id) or agent_id in {"...", "…", "string", "agentId"}:

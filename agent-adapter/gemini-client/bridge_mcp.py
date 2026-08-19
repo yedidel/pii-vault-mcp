@@ -13,12 +13,12 @@ import json
 import os
 from pathlib import Path
 from typing import Any
-
+import httpx
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 
 _OPENAI_BRIDGE_MCP = (
-    Path(__file__).resolve().parent.parent / "openai-client" / "bridge_mcp.py"
+        Path(__file__).resolve().parent.parent / "openai-client" / "bridge_mcp.py"
 )
 _SPEC = importlib.util.spec_from_file_location(
     "openai_bridge_mcp_helpers",
@@ -31,7 +31,7 @@ _SPEC.loader.exec_module(_HELPERS)
 
 normalize_send_action_arguments = _HELPERS.normalize_send_action_arguments
 _enrich_send_action_schema = _HELPERS._enrich_send_action_schema
-
+get_auth_headers = _HELPERS.get_auth_headers
 
 DEFAULT_MCP_URL = os.getenv(
     "BRIDGE_MCP_URL",
@@ -106,6 +106,7 @@ class BridgeMcpClient:
         self._session: ClientSession | None = None
         self._transport_cm = None
         self._session_cm = None
+        self._http_client: httpx.AsyncClient | None = None
         self._gemini_tools: list[dict[str, Any]] = []
 
     @property
@@ -126,7 +127,17 @@ class BridgeMcpClient:
         await self.close()
 
     async def connect(self) -> None:
-        self._transport_cm = streamable_http_client(self.mcp_url)
+        self._http_client = httpx.AsyncClient(
+            headers=get_auth_headers(),
+            follow_redirects=True,
+            timeout=httpx.Timeout(30.0, read=300.0),
+        )
+        await self._http_client.__aenter__()
+
+        self._transport_cm = streamable_http_client(
+            self.mcp_url,
+            http_client=self._http_client,
+        )
         streams = await self._transport_cm.__aenter__()
         read_stream = streams[0]
         write_stream = streams[1]
@@ -138,6 +149,7 @@ class BridgeMcpClient:
         listed = await self._session.list_tools()
         self._gemini_tools = mcp_tools_to_gemini_functions(list(listed.tools))
 
+
     async def close(self) -> None:
         if self._session_cm is not None:
             await self._session_cm.__aexit__(None, None, None)
@@ -147,6 +159,10 @@ class BridgeMcpClient:
         if self._transport_cm is not None:
             await self._transport_cm.__aexit__(None, None, None)
             self._transport_cm = None
+
+        if self._http_client is not None:
+            await self._http_client.__aexit__(None, None, None)
+            self._http_client = None
 
     def _prepare_arguments(
             self,
@@ -161,9 +177,9 @@ class BridgeMcpClient:
             args["sessionId"] = self.interaction_id
 
             default_agent_id = (
-                os.getenv("BRIDGE_AGENT_ID")
-                or os.getenv("GEMINI_BRIDGE_AGENT_ID")
-                or "agent-123"
+                    os.getenv("BRIDGE_AGENT_ID")
+                    or os.getenv("GEMINI_BRIDGE_AGENT_ID")
+                    or "agent-123"
             ).strip()
             agent_id = str(args.get("agentId") or "").strip()
             if (not agent_id) or agent_id in {"...", "…", "string", "agentId"}:

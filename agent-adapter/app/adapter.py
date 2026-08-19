@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 load_dotenv()
 import asyncio
 import os
-
+from transport.auth_middleware import AdapterAuthMiddleware
 import uvicorn
 
 from logutil import configure_logging, get_logger
@@ -32,8 +32,7 @@ async def run_webhook_server():
 
 
 async def run_mcp_http_server():
-    # MCP over Streamable HTTP + /webhook/bridge on the same ASGI app
-    asgi_app = mcp.streamable_http_app()
+    asgi_app = AdapterAuthMiddleware(mcp.streamable_http_app())
     config = uvicorn.Config(
         app=asgi_app,
         host=ADAPTER_HOST,
