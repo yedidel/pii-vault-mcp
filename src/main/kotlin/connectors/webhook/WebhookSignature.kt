@@ -1,21 +1,29 @@
 package connectors.webhook
 
+import java.util.UUID
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
 object WebhookSignature {
 
     const val HEADER_NAME = "X-Webhook-Signature"
+    const val HEADER_TIMESTAMP = "X-Webhook-Timestamp"
+    const val HEADER_NONCE = "X-Webhook-Nonce"
     private const val PREFIX = "sha256="
 
     fun secretFromEnv(): String =
         System.getenv("WEBHOOK_SECRET")?.trim()?.takeIf { it.isNotEmpty() }
             ?: "my-secret-key-12345"
 
-    fun sign(body: String, secret: String): String {
+    fun newNonce(): String = UUID.randomUUID().toString()
+
+    fun signaturePayload(timestamp: String, nonce: String, body: String): String =
+        "$timestamp.$nonce.$body"
+
+    fun sign(timestamp: String, nonce: String, body: String, secret: String): String {
         val mac = Mac.getInstance("HmacSHA256")
         mac.init(SecretKeySpec(secret.toByteArray(Charsets.UTF_8), "HmacSHA256"))
-        val hex = mac.doFinal(body.toByteArray(Charsets.UTF_8))
+        val hex = mac.doFinal(signaturePayload(timestamp, nonce, body).toByteArray(Charsets.UTF_8))
             .joinToString("") { "%02x".format(it) }
         return "$PREFIX$hex"
     }

@@ -13,6 +13,8 @@ async def handle_bridge_webhook_request(
     ok, error = verify_webhook_signature(
         raw_body,
         request.headers.get("X-Webhook-Signature"),
+        request.headers.get("X-Webhook-Timestamp"),
+        request.headers.get("X-Webhook-Nonce"),
     )
     if not ok:
         return {"detail": error}, 401
