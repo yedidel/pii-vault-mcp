@@ -1,6 +1,7 @@
 import json
 import os
 import time
+from workflow.workflow_service import PendingWorkflowLimitError
 from continuation.claude_url_allowlist import is_allowed_claude_wake_url
 from pathlib import Path
 from typing import Annotated
@@ -329,6 +330,10 @@ def send_action(
             "description": workflow.description,
         }
 
+    except PendingWorkflowLimitError as error:
+        return {
+            "error": str(error),
+        }
     except Exception as error:
         return {
             "error": str(error),

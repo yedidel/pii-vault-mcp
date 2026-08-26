@@ -6,7 +6,34 @@ import threading
 from continuation.client_notifier import ClientNotifier, ClientNotifyEvent
 from logutil import get_logger
 
+import os
 
+_DEFAULT_MAX_SSE = 100
+_DEFAULT_QUEUE_MAXSIZE = 32
+
+
+def _max_sse_connections() -> int:
+    raw = os.getenv("ADAPTER_MAX_SSE_CONNECTIONS", "").strip()
+    if not raw:
+        return _DEFAULT_MAX_SSE
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        return _DEFAULT_MAX_SSE
+
+
+def _sse_queue_maxsize() -> int:
+    raw = os.getenv("ADAPTER_SSE_QUEUE_MAXSIZE", "").strip()
+    if not raw:
+        return _DEFAULT_QUEUE_MAXSIZE
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        return _DEFAULT_QUEUE_MAXSIZE
+
+
+class SseConnectionLimitError(Exception):
+    pass
 logger = get_logger(__name__)
 
 
@@ -34,11 +61,16 @@ class SseClientNotifier(ClientNotifier):
         if not key[0] or not key[1]:
             raise ValueError("platform and sessionId are required")
 
-        queue: asyncio.Queue = asyncio.Queue()
+        queue: asyncio.Queue = asyncio.Queue(maxsize=_sse_queue_maxsize())
         with self._lock:
             previous = self._subscribers.get(key)
-            self._subscribers[key] = queue
 
+            if previous is None and len(self._subscribers) >= _max_sse_connections():
+                raise SseConnectionLimitError(
+                    f"Too many SSE connections (max {_max_sse_connections()})"
+                )
+
+            self._subscribers[key] = queue
         # Close the previous connection for this key, if any.
         if previous is not None:
             previous.put_nowait(None)
@@ -74,7 +106,17 @@ class SseClientNotifier(ClientNotifier):
             )
             return
 
-        queue.put_nowait(event)
+        try:
+            queue.put_nowait(event)
+        except asyncio.QueueFull:
+            logger.warning(
+                "SSE queue full for platform=%s sessionId=%s requestId=%s",
+                event.platform,
+                event.sessionId,
+                event.requestId,
+            )
+            return
+
         logger.debug(
             "Delivered client notification platform=%s sessionId=%s "
             "requestId=%s",
@@ -82,3 +124,4 @@ class SseClientNotifier(ClientNotifier):
             event.sessionId,
             event.requestId,
         )
+

@@ -1,5 +1,5 @@
-from typing import Dict
 
+from typing import Dict, Optional
 from pydantic import BaseModel
 
 
@@ -47,7 +47,8 @@ class WorkflowModel(BaseModel):
 
     # response description from the Bridge
     description: str
-
+    # used for pending-workflow TTL eviction
+    createdAt: Optional[float] = None
 
 # notification received from the Bridge webhook
 class ContinuationNotification(BaseModel):

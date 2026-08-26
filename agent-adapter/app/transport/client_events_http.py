@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import AsyncIterator
 
@@ -7,15 +8,18 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, StreamingResponse
 
 from continuation.client_notifier import ClientNotifyEvent
-from continuation.notifiers.sse_client_notifier import SseClientNotifier
+from continuation.notifiers.sse_client_notifier import (
+    SseClientNotifier,
+    SseConnectionLimitError,
+)
 
 
 async def sse_event_stream(
         notifier: SseClientNotifier,
         platform: str,
         session_id: str,
+        queue: asyncio.Queue,
 ) -> AsyncIterator[bytes]:
-    queue = notifier.subscribe(platform, session_id)
     try:
         connected = {
             "type": "connected",
@@ -60,8 +64,13 @@ async def handle_client_events(
             status_code=400,
         )
 
+    try:
+        queue = notifier.subscribe(platform, session_id)
+    except SseConnectionLimitError as error:
+        return JSONResponse({"detail": str(error)}, status_code=503)
+
     return StreamingResponse(
-        sse_event_stream(notifier, platform, session_id),
+        sse_event_stream(notifier, platform, session_id, queue),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
