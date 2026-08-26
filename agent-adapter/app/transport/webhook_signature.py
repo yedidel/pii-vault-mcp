@@ -73,9 +73,8 @@ def verify_webhook_signature(
     """
     secret = os.getenv("WEBHOOK_SECRET", "").strip()
 
-    # Allow requests if secret is not set (development fallback)
     if not secret:
-        return True, None
+        return False, "WEBHOOK_SECRET is not configured"
 
     if not header_value:
         return False, f"Missing required header {HEADER_NAME}"

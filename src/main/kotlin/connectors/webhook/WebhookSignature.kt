@@ -12,8 +12,12 @@ object WebhookSignature {
     private const val PREFIX = "sha256="
 
     fun secretFromEnv(): String =
-        System.getenv("WEBHOOK_SECRET")?.trim()?.takeIf { it.isNotEmpty() }
-            ?: "my-secret-key-12345"
+        readSecret("WEBHOOK_SECRET")
+            ?: error("WEBHOOK_SECRET environment variable is required")
+
+    private fun readSecret(name: String): String? =
+        System.getenv(name)?.trim()?.takeIf { it.isNotEmpty() }
+            ?: System.getProperty(name)?.trim()?.takeIf { it.isNotEmpty() }
 
     fun newNonce(): String = UUID.randomUUID().toString()
 

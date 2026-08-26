@@ -18,6 +18,8 @@ scanBasePackages = [
 class BridgeServerApplication
 
 fun main() {
+    EnvLoader.loadFromRepoEnvFile()
+
     // Starts Spring Boot and initializes DB connection to PostgreSQL (Docker)
     // context contains all Spring beans, including DB connection and repositories
     val context = runApplication<BridgeServerApplication>()
