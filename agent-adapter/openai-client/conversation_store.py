@@ -61,6 +61,22 @@ def save_conversation_id(conversation_id: str, path: Path | None = None) -> None
     _write_store(store_path, payload)
 
 
+def load_sse_token(path: Path | None = None) -> str | None:
+    store_path = path or DEFAULT_STORE_PATH
+    token = str(_read_store(store_path).get("sseToken") or "").strip()
+    return token or None
+
+
+def save_sse_token(sse_token: str, path: Path | None = None) -> None:
+    store_path = path or DEFAULT_STORE_PATH
+    sse_token = sse_token.strip()
+    if not sse_token:
+        raise ValueError("sse_token must be non-empty")
+    payload = _read_store(store_path)
+    payload["sseToken"] = sse_token
+    _write_store(store_path, payload)
+
+
 def ensure_conversation_id(
         *,
         api_key: str | None = None,

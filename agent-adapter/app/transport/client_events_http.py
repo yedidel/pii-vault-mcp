@@ -12,6 +12,7 @@ from continuation.notifiers.sse_client_notifier import (
     SseClientNotifier,
     SseConnectionLimitError,
 )
+from session_registry import SessionRegistry
 
 
 async def sse_event_stream(
@@ -49,19 +50,27 @@ def _sse_frame(event_name: str, payload: dict) -> bytes:
 async def handle_client_events(
         request: Request,
         notifier: SseClientNotifier,
+        session_registry: SessionRegistry,
 ) -> StreamingResponse | JSONResponse:
     platform = str(request.query_params.get("platform") or "").strip()
     session_id = str(request.query_params.get("sessionId") or "").strip()
+    token = str(request.query_params.get("token") or "").strip()
 
-    if not platform or not session_id:
+    if not platform or not session_id or not token:
         return JSONResponse(
             {
                 "detail": (
-                    "Query parameters 'platform' and 'sessionId' "
-                    "are required"
+                    "Query parameters 'platform', 'sessionId', and "
+                    "'token' are required"
                 ),
             },
             status_code=400,
+        )
+
+    if not session_registry.verify_sse_token(platform, session_id, token):
+        return JSONResponse(
+            {"detail": "Invalid or expired session token"},
+            status_code=401,
         )
 
     try:

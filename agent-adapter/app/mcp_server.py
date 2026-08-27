@@ -15,13 +15,16 @@ import main
 from continuation.continuation_provider import DefaultContinuationProvider
 from logutil import get_logger
 from transport.client_events_http import handle_client_events
+from transport.sessions_http import handle_session_register
 from transport.webhook_http import handle_bridge_webhook_request
 from workflow import models
 from workflow.workflow_context import (
+    bridge_session_registry,
     claude_session_registry,
     client_notifier,
     workflow_service,
 )
+from session_registry import SessionConflictError
 from vault_store import load_vault_store
 
 logger = get_logger(__name__)
@@ -115,8 +118,21 @@ async def bridge_webhook_route(request: Request) -> Response:
 
 @mcp.custom_route("/events", methods=["GET"])
 async def client_events_route(request: Request) -> Response:
-    # Client notification SSE: ?platform=...&sessionId=...
-    return await handle_client_events(request, client_notifier)
+    # Client notification SSE: ?platform=...&sessionId=...&token=...
+    return await handle_client_events(
+        request,
+        client_notifier,
+        bridge_session_registry,
+    )
+
+
+@mcp.custom_route("/sessions/register", methods=["POST"])
+async def register_bridge_session_route(request: Request) -> Response:
+    return await handle_session_register(
+        request,
+        bridge_session_registry,
+        USER_INSTALL_ID,
+    )
 
 
 @mcp.custom_route("/continuation/register", methods=["POST"])
@@ -328,6 +344,24 @@ def send_action(
                     "or http://127.0.0.1:<port>/wake"
                 ),
             }
+
+    platform_normalized = (platform or "").strip().lower()
+    session_id_normalized = (sessionId or "").strip()
+    if not platform_normalized or not session_id_normalized:
+        return {
+            "error": "platform and sessionId are required",
+        }
+
+    try:
+        bridge_session_registry.ensure_bound(
+            USER_INSTALL_ID,
+            platform_normalized,
+            session_id_normalized,
+        )
+    except SessionConflictError as error:
+        return {
+            "error": str(error),
+        }
 
     try:
         action_type = (actionType or "").strip().upper()

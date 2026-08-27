@@ -30,7 +30,12 @@ from openai import OpenAI
 
 from bridge_events import subscribe_client_events
 from bridge_mcp import BridgeMcpClient
-from conversation_store import ensure_conversation_id, reset_conversation_id
+from conversation_store import (
+    ensure_conversation_id,
+    reset_conversation_id,
+    save_sse_token,
+)
+from session_register import adapter_base_from_mcp_url, register_bridge_session
 from conversation_updates import (
     fetch_new_conversation_items,
     format_conversation_item,
@@ -186,6 +191,13 @@ async def chat_loop(
     conversation_id = ensure_conversation_id(api_key=api_key)
     openai_client = OpenAI(api_key=api_key)
     events_url = _events_url_from_mcp_url(mcp_url)
+    adapter_base_url = adapter_base_from_mcp_url(mcp_url)
+    sse_token = await register_bridge_session(
+        adapter_base_url=adapter_base_url,
+        platform="openai",
+        session_id=conversation_id,
+    )
+    save_sse_token(sse_token)
 
     # Seed cursor so SSE-driven fetches only show post-subscribe deltas.
     item_cursor = latest_conversation_item_id(openai_client, conversation_id)
@@ -222,6 +234,7 @@ async def chat_loop(
                 events_url=events_url,
                 platform="openai",
                 session_id=conversation_id,
+                token=sse_token,
                 on_event=on_workflow_updated,
             ),
             name="bridge-client-events",

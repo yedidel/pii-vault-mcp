@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from continuation.ContinuationService import ContinuationService
 from continuation.notifiers.sse_client_notifier import SseClientNotifier
 from continuation.providers.claude_provider import ClaudeProvider
@@ -6,12 +8,16 @@ from continuation.providers.openai_provider import OpenAIProvider
 from continuation.session_registry import ClaudeSessionRegistry
 from continuation.wake_dispatcher import WakeDispatcher
 from continuation.webhook_continuation import WebhookContinuation
+from session_registry import load_session_registry
 from workflow.workflow_service import WorkflowService
 
+
+_APP_DIR = Path(__file__).resolve().parent.parent
 
 workflow_service = WorkflowService()
 
 claude_session_registry = ClaudeSessionRegistry()
+bridge_session_registry = load_session_registry(_APP_DIR)
 
 gemini_provider = GeminiProvider()
 claude_provider = ClaudeProvider()

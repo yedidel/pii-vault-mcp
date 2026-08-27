@@ -1,14 +1,25 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+import json
+from pathlib import Path
 
 from workflow import models
 from transport.client_events_http import handle_client_events
+from transport.sessions_http import handle_session_register
 from transport.webhook_http import process_bridge_webhook
-from workflow.workflow_context import client_notifier
+from workflow.workflow_context import (
+    bridge_session_registry,
+    client_notifier,
+)
 
 # FastAPI app used in MCP_TRANSPORT=stdio
 # Exposes Continuation Transport (Bridge webhook) + client SSE events.
 app = FastAPI()
+
+with open(Path(__file__).resolve().parent / "vault_config.json", encoding="utf-8") as config_file:
+    _config = json.load(config_file)
+
+USER_INSTALL_ID = _config["userInstallId"]
 
 
 @app.get("/")
@@ -26,4 +37,17 @@ async def bridge_webhook(
 
 @app.get("/events")
 async def client_events(request: Request):
-    return await handle_client_events(request, client_notifier)
+    return await handle_client_events(
+        request,
+        client_notifier,
+        bridge_session_registry,
+    )
+
+
+@app.post("/sessions/register")
+async def register_bridge_session(request: Request):
+    return await handle_session_register(
+        request,
+        bridge_session_registry,
+        USER_INSTALL_ID,
+    )

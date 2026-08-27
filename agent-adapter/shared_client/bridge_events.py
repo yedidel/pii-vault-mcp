@@ -37,19 +37,21 @@ async def subscribe_client_events(
         events_url: str,
         platform: str,
         session_id: str,
+        token: str,
         on_event: OnEvent,
         on_connected: OnEvent | None = None,
 ) -> None:
     """
     Long-lived SSE subscription to Adapter GET /events.
 
-    Only receives events for this exact (platform, sessionId).
+    Only receives events for this exact (platform, sessionId) when token matches.
     """
     base = events_url.rstrip("/")
     query = urlencode(
         {
             "platform": platform.strip(),
             "sessionId": session_id.strip(),
+            "token": token.strip(),
         }
     )
     url = f"{base}?{query}"

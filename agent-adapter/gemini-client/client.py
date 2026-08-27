@@ -33,7 +33,9 @@ from interaction_store import (
     ensure_interaction_id,
     reset_interaction_id,
     save_interaction_id,
+    save_sse_token,
 )
+from session_register import adapter_base_from_mcp_url, register_bridge_session
 from interaction_updates import fetch_interaction, format_interaction
 
 
@@ -211,13 +213,25 @@ class _EventsSubscription:
             self,
             *,
             events_url: str,
+            adapter_base_url: str,
             on_event,
     ) -> None:
         self.events_url = events_url
+        self.adapter_base_url = adapter_base_url
         self.on_event = on_event
         self.session_id = ""
+        self.sse_token = ""
         self._task: asyncio.Task | None = None
         self._connected = asyncio.Event()
+
+    async def _register_token(self, session_id: str) -> str:
+        token = await register_bridge_session(
+            adapter_base_url=self.adapter_base_url,
+            platform="gemini",
+            session_id=session_id,
+        )
+        save_sse_token(token)
+        return token
 
     async def _handle_connected(self, payload: dict[str, Any]) -> None:
         if str(payload.get("sessionId") or "").strip() != self.session_id:
@@ -247,11 +261,13 @@ class _EventsSubscription:
         self._connected.clear()
         await self.stop()
         self.session_id = session_id
+        self.sse_token = await self._register_token(session_id)
         self._task = asyncio.create_task(
             subscribe_client_events(
                 events_url=self.events_url,
                 platform="gemini",
                 session_id=self.session_id,
+                token=self.sse_token,
                 on_event=self.on_event,
                 on_connected=self._handle_connected,
             ),
@@ -284,6 +300,7 @@ async def chat_loop(
     interaction_id = ensure_interaction_id(api_key=api_key, model=model)
     genai_client = genai.Client(api_key=api_key)
     events_url = _events_url_from_mcp_url(mcp_url)
+    adapter_base_url = adapter_base_from_mcp_url(mcp_url)
 
     print(f"interaction.id = {interaction_id}")
     print(f"model          = {model}")
@@ -342,6 +359,7 @@ async def chat_loop(
     async with BridgeMcpClient(interaction_id, mcp_url=mcp_url) as bridge:
         events = _EventsSubscription(
             events_url=events_url,
+            adapter_base_url=adapter_base_url,
             on_event=on_workflow_updated,
         )
         await events.start(interaction_id)
