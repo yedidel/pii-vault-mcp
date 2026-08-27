@@ -62,6 +62,9 @@ build/
 .idea/
 .vscode/
 .mcp.json
+# Claude channel & Node dependencies
+**/node_modules/
+**/build/
 ### macOS Python cache ###
 .DS_Store
 .idea/
@@ -69,3 +72,4 @@ build/
 # gRPC generated files (Python)
 agent-adapter/app/bridge_pb2.py
 agent-adapter/app/bridge_pb2_grpc.py
+agent-adapter/app/data/

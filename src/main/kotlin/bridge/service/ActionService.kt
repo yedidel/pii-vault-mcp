@@ -25,7 +25,29 @@ class ActionService(
         val actionType = request.actionType.uppercase()
         if (!isLegalAction(actionType)) return failure("Unknown action type $actionType")
 
+        val sensitiveError = validateSensitiveParameters(actionType, request.parametersMap)
+        if (sensitiveError != null) return failure(sensitiveError)
+
         return processAction(request)
+    }
+
+
+    private fun validateSensitiveParameters(
+        actionType: String,
+        parameters: Map<String, String>,
+    ): String? {
+        if (actionType.uppercase() != "FILL_FORM") return null
+
+        for (key in listOf("email", "password")) {
+            val value = parameters[key]?.trim().orEmpty()
+            if (value.isNotEmpty() && !value.startsWith("vault://pii/")) {
+                return (
+                    "Sensitive parameter '$key' must be a vault reference " +
+                        "(vault://pii/...)"
+                    )
+            }
+        }
+        return null
     }
 
 

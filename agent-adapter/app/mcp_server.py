@@ -22,6 +22,7 @@ from workflow.workflow_context import (
     client_notifier,
     workflow_service,
 )
+from vault_store import load_vault_store
 
 logger = get_logger(__name__)
 
@@ -35,6 +36,10 @@ ADAPTER_PORT = int(os.getenv("ADAPTER_PORT", "8000"))
 ADAPTER_PUBLIC_BASE = os.getenv(
     "ADAPTER_PUBLIC_BASE",
     f"http://127.0.0.1:{ADAPTER_PORT}",
+).rstrip("/")
+DEFAULT_DEMO_FORM_URL = os.getenv(
+    "DEMO_FORM_URL",
+    "http://127.0.0.1:9000/register",
 ).rstrip("/")
 
 # One FastMCP instance = one set of tools for both STDIO and HTTP MCP
@@ -50,6 +55,7 @@ with open(CONFIG_PATH, encoding="utf-8") as config_file:
 
 USER_INSTALL_ID = config["userInstallId"]
 continuation_provider = DefaultContinuationProvider()
+pii_vault_store = load_vault_store(BASE_DIR)
 
 
 def _is_local_ingress(url: str) -> bool:
@@ -65,6 +71,40 @@ def _is_local_ingress(url: str) -> bool:
     if not parsed.path.endswith("/wake"):
         return False
     return True
+
+
+def _is_localhost(request: Request) -> bool:
+    client = request.client
+    if client is None:
+        return False
+    return client.host in {"127.0.0.1", "::1", "localhost"}
+
+
+@mcp.custom_route("/vault/resolve", methods=["POST"])
+async def vault_resolve_route(request: Request) -> Response:
+    if not _is_localhost(request):
+        return JSONResponse({"error": "Forbidden"}, status_code=403)
+
+    try:
+        payload = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON body"}, status_code=400)
+
+    refs = payload.get("refs")
+    if not isinstance(refs, list) or not refs:
+        return JSONResponse({"error": "refs must be a non-empty array"}, status_code=400)
+
+    resolved: dict[str, str] = {}
+    try:
+        for ref in refs:
+            ref_text = str(ref).strip()
+            if not ref_text:
+                continue
+            resolved[ref_text] = pii_vault_store.resolve(ref_text)
+    except (KeyError, ValueError) as error:
+        return JSONResponse({"error": str(error)}, status_code=404)
+
+    return JSONResponse({"resolved": resolved})
 
 
 @mcp.custom_route("/webhook/bridge", methods=["POST"])
@@ -215,11 +255,14 @@ async def health_route(_request: Request) -> Response:
     
     FILL_FORM:
     {
-      "id": "...",
+      "formUrl": "http://127.0.0.1:9000/register",
       "name": "...",
       "email": "...",
       "password": "..."
     }
+    Sensitive values (email, password) are stored encrypted and sent to Bridge
+    as vault://pii/... references automatically.
+    formUrl is optional — defaults to the demo registration page.
     
     TRANSACTION:
     {
@@ -250,6 +293,13 @@ def send_action(
                             "description": "ISO currency code, e.g. \"ILS\".",
                         },
                         "id": {"type": "string"},
+                        "formUrl": {
+                            "type": "string",
+                            "description": (
+                                "Registration page URL for FILL_FORM. "
+                                "Defaults to the local demo form."
+                            ),
+                        },
                         "name": {"type": "string"},
                         "email": {"type": "string"},
                         "password": {"type": "string"},
@@ -302,6 +352,25 @@ def send_action(
                     ),
                 }
 
+        if action_type == "FILL_FORM":
+            if not str(params.get("formUrl") or "").strip():
+                params["formUrl"] = DEFAULT_DEMO_FORM_URL
+            missing = [
+                key for key in ("name", "email", "password")
+                if not str(params.get(key) or "").strip()
+            ]
+            if missing:
+                return {
+                    "error": (
+                        "FILL_FORM requires non-empty parameters.name, "
+                        "parameters.email, and parameters.password. "
+                        f"Missing: {', '.join(missing)}. "
+                        "Optional parameters.formUrl defaults to "
+                        f"{DEFAULT_DEMO_FORM_URL}."
+                    ),
+                }
+            params = pii_vault_store.sanitize_fill_form_parameters(params)
+
         continuation_target = continuation_provider.resolve()
 
         action_request = models.ActionRequestModel(
@@ -338,6 +407,20 @@ def send_action(
         return {
             "error": str(error),
         }
+
+
+@mcp.tool(
+    description=(
+        "Store a sensitive value in the encrypted local PII vault and return "
+        "a vault:// reference token for use in send_action parameters."
+    )
+)
+def store_pii(fieldType: str, value: str):
+    try:
+        token = pii_vault_store.store(fieldType, value)
+        return {"token": token}
+    except ValueError as error:
+        return {"error": str(error)}
 
 
 @mcp.tool(

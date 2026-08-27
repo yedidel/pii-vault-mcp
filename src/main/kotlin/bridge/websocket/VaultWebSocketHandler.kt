@@ -106,6 +106,41 @@ class VaultWebSocketHandler(
         println("--- [BRIDGE] Sent encrypted payload to Vault for ID: $requestId ---")
     }
 
+    fun sendFormFillRequestToVault(
+        requestId: String,
+        formUrl: String,
+        fields: Map<String, String>,
+    ) {
+        if (vaultSession == null || !vaultSession!!.isOpen) {
+
+            println("--- [ERROR] No active Vault connection ---")
+
+            publishVaultResponseEvent(
+                requestId = requestId,
+                responseStatus = "FAILED",
+                resultData = "No active Vault connection"
+            )
+
+            return
+        }
+
+        val request = JSONObject()
+        request.put("type", "form_fill_request")
+        request.put("request_id", requestId)
+        request.put("form_url", formUrl)
+
+        val fieldsJson = JSONObject()
+        fields.forEach { (key, value) -> fieldsJson.put(key, value) }
+        request.put("fields", fieldsJson)
+
+        vaultSession?.sendMessage(TextMessage(request.toString()))
+
+        println(
+            "--- [BRIDGE] Sent form_fill_request to Vault for ID: $requestId " +
+                "formUrl=$formUrl ---"
+        )
+    }
+
     private fun publishVaultResponseEvent(
         requestId: String,
         responseStatus: String,

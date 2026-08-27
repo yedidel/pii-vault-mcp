@@ -68,12 +68,7 @@ class WorkflowCommandExecutor(
             }
 
             is RequestVaultEvaluationCommand -> {
-                vaultGateway.requestApproval(
-                    workflowId = command.workflowId,
-                    requestId = command.requestId,
-                    amount = command.amount,
-                    currency = command.currency,
-                )
+                vaultGateway.requestEvaluation(command)
             }
 
             is NotifyAgentCommand -> {

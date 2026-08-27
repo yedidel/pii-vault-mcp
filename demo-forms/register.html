@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>הרשמה — Bridge Demo</title>
+  <style>
+    :root {
+      font-family: system-ui, sans-serif;
+      color: #1a1a1a;
+      background: #f4f6fb;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 1rem;
+    }
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+      padding: 2rem;
+      width: min(480px, 100%);
+    }
+    h1 {
+      margin-top: 0;
+      font-size: 1.5rem;
+    }
+    h2 {
+      font-size: 1rem;
+      margin: 0 0 0.75rem;
+    }
+    label {
+      display: block;
+      margin: 0.75rem 0 0.25rem;
+      font-weight: 600;
+    }
+    input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 0.6rem 0.75rem;
+      border: 1px solid #ccd3e0;
+      border-radius: 8px;
+      font-size: 1rem;
+      transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+    }
+    input.filling {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
+    }
+    input.filled {
+      border-color: #059669;
+      background: #ecfdf5;
+    }
+    button {
+      margin-top: 1.25rem;
+      width: 100%;
+      padding: 0.75rem;
+      border: none;
+      border-radius: 8px;
+      background: #2563eb;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover { background: #1d4ed8; }
+    button.secondary {
+      margin-top: 0.5rem;
+      background: #e5e7eb;
+      color: #111827;
+      font-size: 0.85rem;
+      padding: 0.45rem;
+    }
+    button.secondary:hover { background: #d1d5db; }
+    .hint {
+      margin-top: 1rem;
+      font-size: 0.9rem;
+      color: #5b6475;
+    }
+    .status {
+      margin-top: 1rem;
+      padding: 0.75rem;
+      border-radius: 8px;
+      display: none;
+    }
+    .status.show { display: block; }
+    .status.info { background: #eff6ff; color: #1e40af; }
+    .status.ok { background: #ecfdf5; color: #065f46; }
+    .status.err { background: #fef2f2; color: #991b1b; }
+    .submission-panel {
+      margin-bottom: 1.5rem;
+      padding: 1rem;
+      border-radius: 10px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      display: none;
+    }
+    .submission-panel.visible { display: block; }
+    .submission-panel.remote {
+      border-color: #93c5fd;
+      background: #eff6ff;
+    }
+    .submission-grid {
+      display: grid;
+      gap: 0.35rem;
+      font-size: 0.92rem;
+    }
+    .submission-grid span.label {
+      color: #64748b;
+      min-width: 4.5rem;
+      display: inline-block;
+    }
+    .submission-grid code {
+      font-family: ui-monospace, monospace;
+      font-size: 0.85rem;
+      word-break: break-all;
+    }
+    .recent {
+      margin-top: 2rem;
+      padding-top: 1rem;
+      border-top: 1px solid #e5e7eb;
+    }
+    .recent ul {
+      margin: 0;
+      padding-right: 1.2rem;
+      color: #374151;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>טופס הרשמה (Demo)</h1>
+    <p class="hint">
+      השאירי דף זה פתוח — כשהסוכן שולח FILL_FORM, השדות יתמלאו כאן.
+    </p>
+
+    <div id="submission-panel" class="submission-panel">
+      <h2>מה נשלח מהמערכת</h2>
+      <div class="submission-grid">
+        <div><span class="label">מקור:</span> <code id="sub-source">—</code></div>
+        <div><span class="label">שם:</span> <code id="sub-name">—</code></div>
+        <div><span class="label">אימייל:</span> <code id="sub-email">—</code></div>
+        <div><span class="label">סיסמה:</span> <code id="sub-password">—</code></div>
+        <div><span class="label">זמן:</span> <code id="sub-time">—</code></div>
+      </div>
+      <button type="button" class="secondary" id="toggle-password">הצג סיסמה</button>
+    </div>
+
+    <form id="register-form">
+      <label for="name">שם</label>
+      <input id="name" name="name" type="text" autocomplete="name" required />
+
+      <label for="email">אימייל</label>
+      <input id="email" name="email" type="email" autocomplete="email" required />
+
+      <label for="password">סיסמה</label>
+      <input id="password" name="password" type="password" autocomplete="new-password" required />
+
+      <button type="submit">הרשמה ידנית</button>
+    </form>
+
+    <div id="status" class="status"></div>
+
+    <div class="recent">
+      <h2>הרשמות אחרונות</h2>
+      <ul id="recent-list"><li>טוען…</li></ul>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById("register-form");
+    const statusEl = document.getElementById("status");
+    const recentList = document.getElementById("recent-list");
+    const submissionPanel = document.getElementById("submission-panel");
+    const togglePasswordBtn = document.getElementById("toggle-password");
+
+    let lastSeenId = null;
+    let animating = false;
+    let passwordVisible = false;
+    let latestPassword = "";
+
+    function sleep(ms) {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    function setStatus(kind, message) {
+      statusEl.className = `status show ${kind}`;
+      statusEl.textContent = message;
+    }
+
+    function clearFieldHighlight() {
+      for (const input of form.querySelectorAll("input")) {
+        input.classList.remove("filling", "filled");
+      }
+    }
+
+    async function typeInto(input, text) {
+      input.value = "";
+      input.classList.add("filling");
+      for (const ch of text) {
+        input.value += ch;
+        await sleep(35);
+      }
+      input.classList.remove("filling");
+      input.classList.add("filled");
+    }
+
+    function updateSubmissionPanel(sub) {
+      submissionPanel.classList.add("visible");
+      submissionPanel.classList.toggle("remote", sub.source === "mock-vault");
+      document.getElementById("sub-source").textContent = sub.source || "unknown";
+      document.getElementById("sub-name").textContent = sub.name || "—";
+      document.getElementById("sub-email").textContent = sub.email || "—";
+      document.getElementById("sub-time").textContent = sub.registeredAt || "—";
+      latestPassword = sub.password || "";
+      passwordVisible = false;
+      togglePasswordBtn.textContent = "הצג סיסמה";
+      document.getElementById("sub-password").textContent = maskPassword(latestPassword);
+    }
+
+    function maskPassword(value) {
+      if (!value) return "—";
+      return "•".repeat(Math.min(value.length, 12));
+    }
+
+    togglePasswordBtn.addEventListener("click", () => {
+      passwordVisible = !passwordVisible;
+      togglePasswordBtn.textContent = passwordVisible ? "הסתר סיסמה" : "הצג סיסמה";
+      document.getElementById("sub-password").textContent = passwordVisible
+        ? latestPassword
+        : maskPassword(latestPassword);
+    });
+
+    async function animateRemoteFill(sub) {
+      if (animating) return;
+      animating = true;
+      clearFieldHighlight();
+      form.reset();
+      setStatus("info", "ממלא את הטופס מהסוכן (Mock Vault)…");
+
+      await typeInto(form.name, sub.name || "");
+      await sleep(120);
+      await typeInto(form.email, sub.email || "");
+      await sleep(120);
+      await typeInto(form.password, sub.password || "");
+
+      setStatus(
+        "ok",
+        `הטופס מולא ונשלח בהצלחה (${sub.source}) — ${sub.registrationId}`
+      );
+      animating = false;
+    }
+
+    async function loadRecent() {
+      try {
+        const res = await fetch("/api/registrations");
+        const items = await res.json();
+        if (!items.length) {
+          recentList.innerHTML = "<li>אין הרשמות עדיין</li>";
+          return;
+        }
+        recentList.innerHTML = items
+          .slice(-5)
+          .reverse()
+          .map(
+            (r) =>
+              `<li>${r.name} &lt;${r.email}&gt; — ${r.registeredAt}` +
+              (r.source ? ` (${r.source})` : "") +
+              `</li>`
+          )
+          .join("");
+      } catch {
+        recentList.innerHTML = "<li>לא ניתן לטעון</li>";
+      }
+    }
+
+    async function pollLastSubmission() {
+      try {
+        const res = await fetch("/api/last-submission");
+        const sub = await res.json();
+        if (!sub || !sub.registrationId) return;
+        if (sub.registrationId === lastSeenId) return;
+
+        lastSeenId = sub.registrationId;
+        updateSubmissionPanel(sub);
+
+        if (sub.source === "mock-vault") {
+          await animateRemoteFill(sub);
+        }
+
+        await loadRecent();
+      } catch {
+        /* ignore polling errors */
+      }
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      clearFieldHighlight();
+      statusEl.className = "status";
+
+      const payload = {
+        name: form.name.value.trim(),
+        email: form.email.value.trim(),
+        password: form.password.value,
+        source: "browser-form",
+      };
+
+      try {
+        const res = await fetch("/api/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const body = await res.json();
+        if (!res.ok) throw new Error(body.error || "Request failed");
+
+        lastSeenId = body.registrationId;
+        updateSubmissionPanel({
+          registrationId: body.registrationId,
+          name: body.name,
+          email: body.email,
+          password: payload.password,
+          registeredAt: new Date().toISOString().replace("T", " ").slice(0, 19) + " UTC",
+          source: "browser-form",
+        });
+
+        setStatus("ok", `נרשמת ידנית בהצלחה! מזהה: ${body.registrationId}`);
+        await loadRecent();
+      } catch (error) {
+        setStatus("err", error.message || "שגיאה בהרשמה");
+      }
+    });
+
+    loadRecent();
+    pollLastSubmission();
+    setInterval(pollLastSubmission, 1000);
+    setInterval(loadRecent, 5000);
+  </script>
+</body>
+</html>

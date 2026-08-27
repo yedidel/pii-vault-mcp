@@ -28,9 +28,24 @@ def verify_adapter_auth(request: Request) -> tuple[bool, str | None]:
     return True, None
 
 
+def is_localhost_request(request: Request) -> bool:
+    client = request.client
+    if client is None:
+        return False
+    return client.host in {"127.0.0.1", "::1", "localhost"}
+
+
 def is_public_adapter_path(path: str, method: str) -> bool:
     if path == "/":
         return True
     if path == "/webhook/bridge" and method.upper() == "POST":
         return True
     return False
+
+
+def is_local_vault_resolve(request: Request) -> bool:
+    return (
+        request.url.path == "/vault/resolve"
+        and request.method.upper() == "POST"
+        and is_localhost_request(request)
+    )

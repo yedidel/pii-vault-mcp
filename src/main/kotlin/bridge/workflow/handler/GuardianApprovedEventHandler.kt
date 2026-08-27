@@ -1,6 +1,6 @@
 package bridge.workflow.handler
 
-import bridge.workflow.RequestVaultEvaluationCommand
+import bridge.workflow.VaultEvaluationCommandFactory
 import bridge.workflow.TransitionCommand
 import bridge.workflow.WorkflowContext
 import bridge.workflow.WorkflowDecision
@@ -38,11 +38,10 @@ class GuardianApprovedEventHandler :
                     nextStep = WorkflowStep.REQUEST_VAULT_EVALUATION
                 ),
 
-                RequestVaultEvaluationCommand(
+                VaultEvaluationCommandFactory.fromContext(
                     workflowId = event.workflowId,
                     requestId = event.requestId,
-                    amount = event.context.parameters["amount"] ?: "",
-                    currency = event.context.parameters["currency"] ?: ""
+                    context = event.context,
                 )
 
             )

@@ -106,11 +106,10 @@ class WorkflowEngine(
                 WorkflowState.WAITING_FOR_VAULT_RESPONSE ->
                     WorkflowDecision(
                         commands = listOf(
-                            RequestVaultEvaluationCommand(
+                            VaultEvaluationCommandFactory.fromContext(
                                 workflowId = context.workflowId,
                                 requestId = context.requestId,
-                                amount = context.actionContext.parameters["amount"] ?: "",
-                                currency = context.actionContext.parameters["currency"] ?: ""
+                                context = context.actionContext,
                             )
                         )
                     )

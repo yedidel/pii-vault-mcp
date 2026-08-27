@@ -39,6 +39,9 @@ from interaction_updates import fetch_interaction, format_interaction
 
 DEFAULT_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
 MAX_TOOL_TURNS = int(os.getenv("GEMINI_BRIDGE_MAX_TOOL_TURNS", "12"))
+SSE_CONNECT_TIMEOUT_SECONDS = float(
+    os.getenv("GEMINI_BRIDGE_SSE_CONNECT_TIMEOUT_SECONDS", "10")
+)
 
 SYSTEM_INSTRUCTIONS = """
 You are a Bridge-enabled Gemini agent.
@@ -63,6 +66,19 @@ Rules for send_action:
     \"sessionId\": \"<interaction.id>\",
     \"platform\": \"gemini\"
   }
+- FILL_FORM example:
+  {
+    \"agentId\": \"agent-123\",
+    \"actionType\": \"FILL_FORM\",
+    \"parameters\": {
+      \"name\": \"Dana\",
+      \"email\": \"dana@example.com\",
+      \"password\": \"Secret123\"
+    },
+    \"sessionId\": \"<interaction.id>\",
+    \"platform\": \"gemini\"
+  }
+  formUrl is optional; Mock Vault submits to the demo HTML form.
 
 After send_action returns a requestId / workflowId, you may call
 get_action_status to check progress. Asynchronous Bridge updates continue
@@ -201,6 +217,20 @@ class _EventsSubscription:
         self.on_event = on_event
         self.session_id = ""
         self._task: asyncio.Task | None = None
+        self._connected = asyncio.Event()
+
+    async def _handle_connected(self, payload: dict[str, Any]) -> None:
+        if str(payload.get("sessionId") or "").strip() != self.session_id:
+            return
+        self._connected.set()
+
+    async def wait_connected(
+            self,
+            timeout: float = SSE_CONNECT_TIMEOUT_SECONDS,
+    ) -> None:
+        if self._connected.is_set():
+            return
+        await asyncio.wait_for(self._connected.wait(), timeout=timeout)
 
     async def start(self, session_id: str) -> None:
         session_id = session_id.strip()
@@ -214,6 +244,7 @@ class _EventsSubscription:
         ):
             return
 
+        self._connected.clear()
         await self.stop()
         self.session_id = session_id
         self._task = asyncio.create_task(
@@ -222,6 +253,7 @@ class _EventsSubscription:
                 platform="gemini",
                 session_id=self.session_id,
                 on_event=self.on_event,
+                on_connected=self._handle_connected,
             ),
             name="bridge-client-events",
         )
@@ -319,6 +351,14 @@ async def chat_loop(
             async with tip_lock:
                 awaiting_wake_session_id = session_id
                 await events.start(session_id)
+                try:
+                    await events.wait_connected()
+                except asyncio.TimeoutError:
+                    print(
+                        "warning> SSE connect timeout for sessionId="
+                        f"{session_id}",
+                        file=sys.stderr,
+                    )
 
         try:
             while True:
@@ -336,14 +376,36 @@ async def chat_loop(
                 async with tip_lock:
                     current_id = interaction_id
 
-                response, tip_id, _send_action_session_id = await _run_tool_loop(
-                    genai_client=genai_client,
-                    bridge=bridge,
-                    interaction_id=current_id,
-                    model=model,
-                    user_input=user_text,
-                    on_send_action_session=on_send_action_session,
-                )
+                try:
+                    response, tip_id, _send_action_session_id = await _run_tool_loop(
+                        genai_client=genai_client,
+                        bridge=bridge,
+                        interaction_id=current_id,
+                        model=model,
+                        user_input=user_text,
+                        on_send_action_session=on_send_action_session,
+                    )
+                except Exception as error:
+                    name = type(error).__name__
+                    message = str(error)
+                    if "RateLimit" in name or "429" in message:
+                        print(
+                            "\nerror> Gemini quota exceeded. Wait about a minute, "
+                            "or test without Gemini:\n"
+                            "  cd ..\\app && python test_fill_form.py\n",
+                            file=sys.stderr,
+                        )
+                    elif "no longer available" in message.lower():
+                        print(
+                            f"\nerror> Model {model!r} is unavailable. "
+                            "Unset GEMINI_MODEL or use gemini-3.6-flash.\n",
+                            file=sys.stderr,
+                        )
+                    else:
+                        print(f"\nerror> Gemini request failed: {error}\n", file=sys.stderr)
+                    print("you> ", end="", flush=True)
+                    continue
+
                 _print_assistant(getattr(response, "output_text", "") or "")
 
                 async with tip_lock:

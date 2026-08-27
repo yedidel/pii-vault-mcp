@@ -1,7 +1,11 @@
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
-from transport.adapter_auth import is_public_adapter_path, verify_adapter_auth
+from transport.adapter_auth import (
+    is_local_vault_resolve,
+    is_public_adapter_path,
+    verify_adapter_auth,
+)
 
 
 class AdapterAuthMiddleware:
@@ -15,6 +19,10 @@ class AdapterAuthMiddleware:
 
         request = Request(scope, receive=receive)
         if is_public_adapter_path(request.url.path, request.method):
+            await self.app(scope, receive, send)
+            return
+
+        if is_local_vault_resolve(request):
             await self.app(scope, receive, send)
             return
 

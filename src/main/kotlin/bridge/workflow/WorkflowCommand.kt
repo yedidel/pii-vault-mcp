@@ -61,9 +61,15 @@ data class RequestVaultEvaluationCommand(
 
     val requestId: String,
 
-    val amount: String,
+    val actionType: String,
 
-    val currency: String
+    val amount: String = "",
+
+    val currency: String = "",
+
+    val formUrl: String = "",
+
+    val fields: Map<String, String> = emptyMap(),
 
 ) : WorkflowCommand
 

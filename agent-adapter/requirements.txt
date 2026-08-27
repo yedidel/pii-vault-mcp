@@ -7,3 +7,4 @@ mcp # MCP library for communication with the MCP server
 google-genai # Gemini Interactions API (Google AI Studio / Gemini API)
 openai # OpenAI Responses + Conversations API (OpenAIProvider wake)
 requests # ClaudeProvider HTTP POST to Channel ingress
+cryptography # Encrypted local PII vault store (vault:// references)

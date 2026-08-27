@@ -1,5 +1,7 @@
 package bridge.integration
 
+import bridge.workflow.RequestVaultEvaluationCommand
+
 /**
  * Gateway responsible for communicating with the Vault.
  *
@@ -15,10 +17,5 @@ interface VaultGateway {
      * The Vault will eventually respond with an ActionResponse,
      * which will be translated into a workflow event.
      */
-    fun requestApproval(
-        workflowId: String,
-        requestId: String,
-        amount: String,
-        currency: String
-    )
+    fun requestEvaluation(command: RequestVaultEvaluationCommand)
 }
