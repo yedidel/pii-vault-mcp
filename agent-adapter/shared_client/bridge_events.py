@@ -38,6 +38,7 @@ async def subscribe_client_events(
         platform: str,
         session_id: str,
         on_event: OnEvent,
+        on_connected: OnEvent | None = None,
 ) -> None:
     """
     Long-lived SSE subscription to Adapter GET /events.
@@ -93,15 +94,22 @@ async def subscribe_client_events(
                     name = event_name
                     event_name = "message"
 
-                    if name != "workflow.updated":
-                        continue
-
                     try:
                         payload = json.loads(raw)
                     except json.JSONDecodeError:
                         continue
 
                     if not isinstance(payload, dict):
+                        continue
+
+                    if name == "connected":
+                        if on_connected is not None:
+                            result = on_connected(payload)
+                            if isinstance(result, Awaitable):
+                                await result
+                        continue
+
+                    if name != "workflow.updated":
                         continue
 
                     result = on_event(payload)

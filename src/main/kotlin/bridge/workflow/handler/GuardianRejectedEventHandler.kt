@@ -1,6 +1,9 @@
 package bridge.workflow.handler
+import bridge.Bridge.StatusType
+import bridge.workflow.NotifyAgentCommand
 import bridge.workflow.PublishEventCommand
 import bridge.workflow.TransitionCommand
+import bridge.workflow.UpdateActionStatusCommand
 import bridge.workflow.WorkflowContext
 import bridge.workflow.WorkflowDecision
 import bridge.workflow.WorkflowEventType
@@ -35,6 +38,12 @@ class GuardianRejectedEventHandler :
                     nextStep = WorkflowStep.FINISHED
                 ),
 
+                UpdateActionStatusCommand(
+                    requestId = event.requestId,
+                    status = StatusType.REJECTED,
+                    resultData = event.reason,
+                ),
+
                 PublishEventCommand(
                     WorkflowFailedEvent(
                         workflowId = event.workflowId,
@@ -42,7 +51,12 @@ class GuardianRejectedEventHandler :
                         context = event.context,
                         failureReason = event.reason
                     )
-                )
+                ),
+
+                NotifyAgentCommand(
+                    requestId = event.requestId,
+                    message = event.reason,
+                ),
 
             )
         )
