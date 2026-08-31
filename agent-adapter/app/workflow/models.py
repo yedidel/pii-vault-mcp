@@ -47,6 +47,8 @@ class WorkflowModel(BaseModel):
 
     # response description from the Bridge
     description: str
+    # WEBHOOK (push) or POLLING (Adapter polls Bridge status)
+    connectorType: str = "WEBHOOK"
     # used for pending-workflow TTL eviction
     createdAt: Optional[float] = None
 

@@ -7,6 +7,8 @@ from continuation.providers.gemini_provider import GeminiProvider
 from continuation.providers.openai_provider import OpenAIProvider
 from continuation.session_registry import ClaudeSessionRegistry
 from continuation.wake_dispatcher import WakeDispatcher
+from continuation.polling_continuation import PollingContinuation
+from continuation.polling_worker import PollingWorker
 from continuation.webhook_continuation import WebhookContinuation
 from session_registry import load_session_registry
 from workflow.workflow_service import WorkflowService
@@ -43,4 +45,13 @@ continuation_service = ContinuationService(
 
 webhook_continuation = WebhookContinuation(
     continuation_service,
+)
+
+polling_continuation = PollingContinuation(
+    continuation_service,
+)
+
+polling_worker = PollingWorker(
+    workflow_service=workflow_service,
+    polling_continuation=polling_continuation,
 )

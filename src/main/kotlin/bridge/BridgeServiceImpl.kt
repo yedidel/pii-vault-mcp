@@ -123,6 +123,7 @@ class BridgeServiceImpl(
         return StatusResponse.newBuilder()
             .setRequestId(action.requestId)
             .setStatus(action.status)
+            .setResultData(action.resultData ?: "")
             .build()
     }
 }

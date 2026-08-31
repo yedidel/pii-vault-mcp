@@ -61,6 +61,7 @@ class WorkflowService:
             currentStatus=response["status"],
             actionType=action_request.actionType,
             description=response["description"],
+            connectorType=(action_request.connectorType or "WEBHOOK").strip(),
             createdAt=time.time(),
         )
         self._enforce_pending_limit()
@@ -103,6 +104,24 @@ class WorkflowService:
 
     def remove_workflow(self, request_id: str) -> None:
         self.pending_workflows.pop(request_id, None)
+
+    def list_pending_polling(self) -> list[WorkflowModel]:
+        return [
+            workflow
+            for workflow in self.pending_workflows.values()
+            if (workflow.connectorType or "").strip().upper() == "POLLING"
+        ]
+
+    def is_pending_timed_out(
+            self,
+            request_id: str,
+            timeout_seconds: float,
+    ) -> bool:
+        workflow = self.get_workflow(request_id)
+        if workflow is None or workflow.createdAt is None:
+            return False
+        return (time.time() - workflow.createdAt) > timeout_seconds
+
     def _evict_expired(self) -> None:
         ttl = _pending_ttl_seconds()
         now = time.time()
