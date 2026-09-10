@@ -182,8 +182,9 @@ class PairingWatcher:
         )
 
         resume_session_id = session_id
-        if platform == "openai":
+        if platform in {"openai", "sdk"}:
             # OpenAI client continues via vault.paired SSE + local tool loop.
+            # SDK retries send_action after pairing (no LLM wake).
             # Skipping adapter wake avoids duplicate send_action calls.
             logger.info(
                 "Pairing wake skipped for OpenAI; client will continue via SSE "

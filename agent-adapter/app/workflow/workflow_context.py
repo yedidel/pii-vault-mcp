@@ -5,6 +5,7 @@ from continuation.notifiers.sse_client_notifier import SseClientNotifier
 from continuation.providers.claude_provider import ClaudeProvider
 from continuation.providers.gemini_provider import GeminiProvider
 from continuation.providers.openai_provider import OpenAIProvider
+from continuation.providers.sdk_provider import SdkProvider
 from continuation.session_registry import ClaudeSessionRegistry
 from continuation.wake_dispatcher import WakeDispatcher
 from continuation.polling_continuation import PollingContinuation
@@ -31,6 +32,7 @@ bridge_session_registry = load_session_registry(_APP_DIR)
 gemini_provider = GeminiProvider()
 claude_provider = ClaudeProvider()
 openai_provider = OpenAIProvider()
+sdk_provider = SdkProvider()
 
 # Shared across webhook wake path and GET /events subscriptions.
 client_notifier = SseClientNotifier()
@@ -41,6 +43,7 @@ wake_dispatcher = WakeDispatcher(
         "google": gemini_provider,
         "claude": claude_provider,
         "openai": openai_provider,
+        "sdk": sdk_provider,
     },
     client_notifier=client_notifier,
 )
