@@ -10,6 +10,7 @@ from transport.webhook_http import process_bridge_webhook
 from workflow.workflow_context import (
     bridge_session_registry,
     client_notifier,
+    pairing_service,
 )
 
 # FastAPI app used in MCP_TRANSPORT=stdio
@@ -18,8 +19,6 @@ app = FastAPI()
 
 with open(Path(__file__).resolve().parent / "vault_config.json", encoding="utf-8") as config_file:
     _config = json.load(config_file)
-
-USER_INSTALL_ID = _config["userInstallId"]
 
 
 @app.get("/")
@@ -49,5 +48,5 @@ async def register_bridge_session(request: Request):
     return await handle_session_register(
         request,
         bridge_session_registry,
-        USER_INSTALL_ID,
+        pairing_service.resolve_for_session(),
     )

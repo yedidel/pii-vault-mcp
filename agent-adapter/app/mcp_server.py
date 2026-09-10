@@ -22,9 +22,11 @@ from workflow.workflow_context import (
     bridge_session_registry,
     claude_session_registry,
     client_notifier,
+    pairing_service,
     workflow_service,
 )
 from session_registry import SessionConflictError
+from pairing_service import PairingRequired
 from vault_store import load_vault_store
 
 logger = get_logger(__name__)
@@ -59,6 +61,22 @@ with open(CONFIG_PATH, encoding="utf-8") as config_file:
 USER_INSTALL_ID = config["userInstallId"]
 continuation_provider = DefaultContinuationProvider()
 pii_vault_store = load_vault_store(BASE_DIR)
+
+
+def _resolve_user_install_id(
+        *,
+        platform: str | None = None,
+        session_id: str | None = None,
+        action_summary: str | None = None,
+) -> str | dict:
+    outcome = pairing_service.resolve(
+        platform=platform,
+        session_id=session_id,
+        action_summary=action_summary,
+    )
+    if isinstance(outcome, PairingRequired):
+        return pairing_service.pairing_required_response(outcome)
+    return outcome.user_install_id
 
 
 def _is_local_ingress(url: str) -> bool:
@@ -131,7 +149,7 @@ async def register_bridge_session_route(request: Request) -> Response:
     return await handle_session_register(
         request,
         bridge_session_registry,
-        USER_INSTALL_ID,
+        pairing_service.resolve_for_session(),
     )
 
 
@@ -352,9 +370,20 @@ def send_action(
             "error": "platform and sessionId are required",
         }
 
+    user_install_id = _resolve_user_install_id(
+        platform=platform_normalized,
+        session_id=session_id_normalized,
+        action_summary=(
+            f"{(actionType or '').strip().upper()} "
+            f"agentId={agentId}"
+        ),
+    )
+    if isinstance(user_install_id, dict):
+        return user_install_id
+
     try:
         bridge_session_registry.ensure_bound(
-            USER_INSTALL_ID,
+            user_install_id,
             platform_normalized,
             session_id_normalized,
         )
@@ -409,7 +438,7 @@ def send_action(
 
         action_request = models.ActionRequestModel(
             agentId=agentId,
-            userInstallId=USER_INSTALL_ID,
+            userInstallId=user_install_id,
             actionType=actionType,
             parameters=params,
             connectorType=continuation_target.connector_type,

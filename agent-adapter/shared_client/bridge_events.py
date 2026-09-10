@@ -111,7 +111,7 @@ async def subscribe_client_events(
                                 await result
                         continue
 
-                    if name != "workflow.updated":
+                    if name not in {"workflow.updated", "vault.paired"}:
                         continue
 
                     result = on_event(payload)

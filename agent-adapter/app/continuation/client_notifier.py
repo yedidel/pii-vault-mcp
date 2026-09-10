@@ -4,6 +4,14 @@ from typing import Literal
 from pydantic import BaseModel
 
 
+class VaultPairedEvent(BaseModel):
+    type: Literal["vault.paired"] = "vault.paired"
+    platform: str
+    sessionId: str
+    userInstallId: str
+    resumeSessionId: str | None = None
+
+
 class ClientNotifyEvent(BaseModel):
     """
     Platform-agnostic signal that a workflow has new data available.
@@ -36,9 +44,15 @@ class ClientNotifier(ABC):
         (event.platform, event.sessionId). No-op if none is connected.
         """
 
+    @abstractmethod
+    def notify_vault_paired(self, event: VaultPairedEvent) -> None:
+        """Deliver vault pairing completion to the subscribed client session."""
 
 class NoopClientNotifier(ClientNotifier):
     """Default notifier when no client transport is wired."""
 
     def notify(self, event: ClientNotifyEvent) -> None:
+        return
+
+    def notify_vault_paired(self, event: VaultPairedEvent) -> None:
         return

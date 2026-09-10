@@ -7,7 +7,7 @@ from typing import AsyncIterator
 from starlette.requests import Request
 from starlette.responses import JSONResponse, StreamingResponse
 
-from continuation.client_notifier import ClientNotifyEvent
+from continuation.client_notifier import ClientNotifyEvent, VaultPairedEvent
 from continuation.notifiers.sse_client_notifier import (
     SseClientNotifier,
     SseConnectionLimitError,
@@ -34,10 +34,12 @@ async def sse_event_stream(
             if item is None:
                 break
 
-            if not isinstance(item, ClientNotifyEvent):
+            if isinstance(item, ClientNotifyEvent):
+                yield _sse_frame("workflow.updated", item.model_dump())
                 continue
 
-            yield _sse_frame("workflow.updated", item.model_dump())
+            if isinstance(item, VaultPairedEvent):
+                yield _sse_frame("vault.paired", item.model_dump())
     finally:
         notifier.unsubscribe(platform, session_id, queue)
 

@@ -11,7 +11,7 @@ import uvicorn
 from logutil import configure_logging, get_logger
 from mcp_server import mcp
 from server import app
-from workflow.workflow_context import polling_worker
+from workflow.workflow_context import polling_worker, pairing_watcher
 
 
 # MCP Transport: how the LLM connects to this Adapter
@@ -57,6 +57,10 @@ async def run_adapter():
         polling_worker.run(),
         name="adapter-polling-worker",
     )
+    pairing_task = asyncio.create_task(
+        pairing_watcher.run(),
+        name="adapter-pairing-watcher",
+    )
 
     try:
         if MCP_TRANSPORT == "stdio":
@@ -66,7 +70,7 @@ async def run_adapter():
                 "Starting Adapter: MCP_TRANSPORT=stdio, "
                 "webhook on http://%s:%s/webhook/bridge, "
                 "events on http://%s:%s/events, "
-                "polling worker enabled",
+                "polling worker enabled, pairing watcher enabled",
                 ADAPTER_HOST,
                 ADAPTER_PORT,
                 ADAPTER_HOST,
@@ -76,6 +80,7 @@ async def run_adapter():
                 run_mcp_stdio(),
                 run_webhook_server(),
                 polling_task,
+                pairing_task,
             )
             return
 
@@ -87,7 +92,7 @@ async def run_adapter():
                 "MCP on http://%s:%s/mcp, "
                 "webhook on http://%s:%s/webhook/bridge, "
                 "events on http://%s:%s/events, "
-                "polling worker enabled",
+                "polling worker enabled, pairing watcher enabled",
                 ADAPTER_HOST,
                 ADAPTER_PORT,
                 ADAPTER_HOST,
@@ -98,6 +103,7 @@ async def run_adapter():
             await asyncio.gather(
                 run_mcp_http_server(),
                 polling_task,
+                pairing_task,
             )
             return
 
@@ -107,9 +113,15 @@ async def run_adapter():
         )
     finally:
         polling_worker.stop()
+        pairing_watcher.stop()
         polling_task.cancel()
+        pairing_task.cancel()
         try:
             await polling_task
+        except asyncio.CancelledError:
+            pass
+        try:
+            await pairing_task
         except asyncio.CancelledError:
             pass
 

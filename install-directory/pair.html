@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>חיבור Mock Vault</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 32rem;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      line-height: 1.5;
+    }
+    .card {
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 1.25rem;
+    }
+    button {
+      font-size: 1rem;
+      padding: 0.6rem 1.2rem;
+      cursor: pointer;
+    }
+    .ok { color: #0a7; }
+    .err { color: #c00; }
+    code { background: #f4f4f4; padding: 0.1rem 0.3rem; }
+  </style>
+</head>
+<body>
+  <h1>חיבור Mock Vault</h1>
+  <div class="card">
+    <p>קוד pairing: <code id="code">—</code></p>
+    <p id="status">לחצי «חבר» כדי ליצור <code>user_install_id</code> ולרשום את הכספת.</p>
+    <button id="connect" type="button">חבר Mock Vault</button>
+    <pre id="result" hidden></pre>
+  </div>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const pairingCode = (params.get("code") || "").trim();
+    document.getElementById("code").textContent = pairingCode || "(חסר code ב-URL)";
+
+    document.getElementById("connect").addEventListener("click", async () => {
+      const statusEl = document.getElementById("status");
+      const resultEl = document.getElementById("result");
+      if (!pairingCode) {
+        statusEl.innerHTML = '<span class="err">חסר pairing code ב-URL.</span>';
+        return;
+      }
+      statusEl.textContent = "מחבר...";
+      try {
+        const res = await fetch("/api/pair/complete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pairingCode }),
+        });
+        const body = await res.json();
+        resultEl.hidden = false;
+        resultEl.textContent = JSON.stringify(body, null, 2);
+        if (!res.ok) {
+          statusEl.innerHTML = '<span class="err">' + (body.detail || "שגיאה") + '</span>';
+          return;
+        }
+        statusEl.innerHTML =
+          '<span class="ok">מחובר!</span> user_install_id: <code>' +
+          body.userInstallId + "</code>";
+      } catch (err) {
+        statusEl.innerHTML = '<span class="err">' + err + '</span>';
+      }
+    });
+  </script>
+</body>
+</html>

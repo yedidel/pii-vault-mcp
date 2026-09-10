@@ -12,6 +12,11 @@ SSE_TOKEN_PREFIX = "sse_"
 DEFAULT_TTL_SECONDS = int(
     os.getenv("SESSION_REGISTRY_TTL_SECONDS", str(24 * 3600))
 )
+# Placeholder ids from vault_config.json before real vault pairing.
+LEGACY_USER_INSTALL_IDS = frozenset({
+    "some-value",
+    "device_123",
+})
 
 
 class SessionConflictError(PermissionError):
@@ -151,12 +156,21 @@ class SessionRegistry:
 
             if existing is not None:
                 if existing.user_install_id != user_install_id:
-                    raise SessionConflictError(
-                        "Session already registered to another user"
-                    )
-                if existing.expires_at > now:
+                    if existing.user_install_id in LEGACY_USER_INSTALL_IDS:
+                        self._delete_unlocked(platform, session_id)
+                    elif user_install_id in LEGACY_USER_INSTALL_IDS:
+                        # Client startup before pairing.json reload; keep the
+                        # real install binding already stored for this session.
+                        if existing.expires_at > now:
+                            return existing
+                        self._delete_unlocked(platform, session_id)
+                    else:
+                        # Vault re-paired on this adapter — rebind session.
+                        self._delete_unlocked(platform, session_id)
+                elif existing.expires_at > now:
                     return existing
-                self._delete_unlocked(platform, session_id)
+                else:
+                    self._delete_unlocked(platform, session_id)
 
             expires_at = now + timedelta(seconds=DEFAULT_TTL_SECONDS)
             sse_token = SSE_TOKEN_PREFIX + secrets.token_urlsafe(32)

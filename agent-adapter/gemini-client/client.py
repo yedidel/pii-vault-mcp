@@ -125,38 +125,18 @@ def _extract_function_calls(interaction: Any) -> list[Any]:
     return calls
 
 
-async def _run_tool_loop(
+async def _continue_tool_calls(
         *,
         genai_client: genai.Client,
         bridge: BridgeMcpClient,
-        interaction_id: str,
+        interaction: Any,
         model: str,
-        user_input: str | list[dict[str, Any]],
+        tip_id: str,
         on_send_action_session: Any = None,
 ) -> tuple[Any, str, str | None]:
-    """
-    Returns (final_interaction, tip_interaction_id, send_action_session_id).
-
-    send_action_session_id is the sessionId actually injected into Bridge —
-    the SSE subscription must stay on that id until the wake arrives.
-    """
+    """Execute pending function calls on an interaction and follow tool turns."""
     tools = bridge.gemini_tools or None
-    tip_id = interaction_id
     send_action_session_id: str | None = None
-
-    bridge.set_interaction_id(tip_id)
-
-    interaction = genai_client.interactions.create(
-        model=model,
-        previous_interaction_id=tip_id,
-        system_instruction=SYSTEM_INSTRUCTIONS
-        + f"\n\nCurrent interaction.id (use as send_action sessionId): "
-        + tip_id,
-        input=user_input,
-        tools=tools,
-    )
-    tip_id = (interaction.id or tip_id).strip()
-    bridge.set_interaction_id(tip_id)
 
     for _ in range(MAX_TOOL_TURNS):
         function_calls = _extract_function_calls(interaction)
@@ -206,6 +186,48 @@ async def _run_tool_loop(
     return interaction, tip_id, send_action_session_id
 
 
+async def _run_tool_loop(
+        *,
+        genai_client: genai.Client,
+        bridge: BridgeMcpClient,
+        interaction_id: str,
+        model: str,
+        user_input: str | list[dict[str, Any]],
+        on_send_action_session: Any = None,
+) -> tuple[Any, str, str | None]:
+    """
+    Returns (final_interaction, tip_interaction_id, send_action_session_id).
+
+    send_action_session_id is the sessionId actually injected into Bridge —
+    the SSE subscription must stay on that id until the wake arrives.
+    """
+    tools = bridge.gemini_tools or None
+    tip_id = interaction_id
+
+    bridge.set_interaction_id(tip_id)
+
+    interaction = genai_client.interactions.create(
+        model=model,
+        previous_interaction_id=tip_id,
+        system_instruction=SYSTEM_INSTRUCTIONS
+        + f"\n\nCurrent interaction.id (use as send_action sessionId): "
+        + tip_id,
+        input=user_input,
+        tools=tools,
+    )
+    tip_id = (interaction.id or tip_id).strip()
+    bridge.set_interaction_id(tip_id)
+
+    return await _continue_tool_calls(
+        genai_client=genai_client,
+        bridge=bridge,
+        interaction=interaction,
+        model=model,
+        tip_id=tip_id,
+        on_send_action_session=on_send_action_session,
+    )
+
+
 class _EventsSubscription:
     """Manage a single SSE subscription that can be restarted on session rotate."""
 
@@ -223,6 +245,29 @@ class _EventsSubscription:
         self.sse_token = ""
         self._task: asyncio.Task | None = None
         self._connected = asyncio.Event()
+        self._restart_task: asyncio.Task | None = None
+
+    def schedule_start(self, session_id: str) -> None:
+        """Restart SSE after the current event callback returns (avoid deadlock)."""
+        session_id = session_id.strip()
+        if not session_id:
+            return
+        if self._restart_task is not None and not self._restart_task.done():
+            self._restart_task.cancel()
+        self._restart_task = asyncio.create_task(
+            self._deferred_start(session_id),
+            name="bridge-client-events-restart",
+        )
+
+    async def _deferred_start(self, session_id: str) -> None:
+        await asyncio.sleep(0)
+        try:
+            await self.start(session_id)
+        except Exception as error:
+            print(
+                f"error> SSE resubscribe failed sessionId={session_id}: {error}",
+                file=sys.stderr,
+            )
 
     async def _register_token(self, session_id: str) -> str:
         token = await register_bridge_session(
@@ -311,63 +356,18 @@ async def chat_loop(
     tip_lock = asyncio.Lock()
     events: _EventsSubscription | None = None
     awaiting_wake_session_id: str | None = None
-
-    async def on_workflow_updated(payload: dict[str, Any]) -> None:
-        nonlocal interaction_id, awaiting_wake_session_id
-
-        resume_session_id = str(payload.get("resumeSessionId") or "").strip()
-        if not resume_session_id:
-            print(
-                "error> workflow.updated missing resumeSessionId",
-                file=sys.stderr,
-            )
-            return
-
-        print(
-            f"\nworkflow> status={payload.get('status')} "
-            f"requestId={payload.get('requestId')}"
-        )
-
-        try:
-            interaction = await asyncio.to_thread(
-                fetch_interaction,
-                genai_client,
-                resume_session_id,
-            )
-        except Exception as error:
-            print(
-                f"error> interactions.get failed: {error}",
-                file=sys.stderr,
-            )
-            return
-
-        fetched_id = (getattr(interaction, "id", None) or resume_session_id).strip()
-        rendered = format_interaction(interaction)
-        if rendered:
-            print(f"\nassistant> {rendered}\n")
-
-        async with tip_lock:
-            interaction_id = fetched_id
-            save_interaction_id(interaction_id)
-            bridge.set_interaction_id(interaction_id)
-            awaiting_wake_session_id = None
-            if events is not None:
-                await events.start(interaction_id)
-
-        print("you> ", end="", flush=True)
+    in_sse_callback = False
 
     async with BridgeMcpClient(interaction_id, mcp_url=mcp_url) as bridge:
-        events = _EventsSubscription(
-            events_url=events_url,
-            adapter_base_url=adapter_base_url,
-            on_event=on_workflow_updated,
-        )
-        await events.start(interaction_id)
-
         async def on_send_action_session(session_id: str) -> None:
             nonlocal awaiting_wake_session_id
             async with tip_lock:
                 awaiting_wake_session_id = session_id
+                if events is None:
+                    return
+                if in_sse_callback:
+                    events.schedule_start(session_id)
+                    return
                 await events.start(session_id)
                 try:
                     await events.wait_connected()
@@ -377,6 +377,93 @@ async def chat_loop(
                         f"{session_id}",
                         file=sys.stderr,
                     )
+
+        async def on_client_event(payload: dict[str, Any]) -> None:
+            nonlocal interaction_id, awaiting_wake_session_id, in_sse_callback
+            in_sse_callback = True
+            try:
+                await _handle_client_event(payload)
+            finally:
+                in_sse_callback = False
+
+        async def _handle_client_event(payload: dict[str, Any]) -> None:
+            nonlocal interaction_id, awaiting_wake_session_id
+
+            event_type = str(payload.get("type") or "workflow.updated").strip()
+
+            resume_session_id = str(payload.get("resumeSessionId") or "").strip()
+            if not resume_session_id:
+                print(
+                    f"error> {event_type} missing resumeSessionId",
+                    file=sys.stderr,
+                )
+                return
+
+            if event_type == "vault.paired":
+                print(
+                    f"\nvault> paired userInstallId={payload.get('userInstallId')}"
+                )
+            else:
+                print(
+                    f"\nworkflow> status={payload.get('status')} "
+                    f"requestId={payload.get('requestId')}"
+                )
+
+            try:
+                interaction = await asyncio.to_thread(
+                    fetch_interaction,
+                    genai_client,
+                    resume_session_id,
+                )
+            except Exception as error:
+                print(
+                    f"error> interactions.get failed: {error}",
+                    file=sys.stderr,
+                )
+                return
+
+            fetched_id = (
+                getattr(interaction, "id", None) or resume_session_id
+            ).strip()
+            bridge.set_interaction_id(fetched_id)
+
+            if _extract_function_calls(interaction):
+                try:
+                    interaction, fetched_id, _ = await _continue_tool_calls(
+                        genai_client=genai_client,
+                        bridge=bridge,
+                        interaction=interaction,
+                        model=model,
+                        tip_id=fetched_id,
+                        on_send_action_session=on_send_action_session,
+                    )
+                except Exception as error:
+                    print(
+                        f"error> continue tool calls failed: {error}",
+                        file=sys.stderr,
+                    )
+                    return
+
+            rendered = format_interaction(interaction)
+            if rendered:
+                print(f"\nassistant> {rendered}\n")
+
+            async with tip_lock:
+                interaction_id = fetched_id
+                save_interaction_id(interaction_id)
+                bridge.set_interaction_id(interaction_id)
+                awaiting_wake_session_id = None
+                if events is not None:
+                    events.schedule_start(interaction_id)
+
+            print("you> ", end="", flush=True)
+
+        events = _EventsSubscription(
+            events_url=events_url,
+            adapter_base_url=adapter_base_url,
+            on_event=on_client_event,
+        )
+        await events.start(interaction_id)
 
         try:
             while True:

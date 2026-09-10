@@ -3,7 +3,11 @@ from __future__ import annotations
 import asyncio
 import threading
 
-from continuation.client_notifier import ClientNotifier, ClientNotifyEvent
+from continuation.client_notifier import (
+    ClientNotifier,
+    ClientNotifyEvent,
+    VaultPairedEvent,
+)
 from logutil import get_logger
 
 import os
@@ -123,5 +127,38 @@ class SseClientNotifier(ClientNotifier):
             event.platform,
             event.sessionId,
             event.requestId,
+        )
+
+    def notify_vault_paired(self, event: VaultPairedEvent) -> None:
+        key = _subscriber_key(event.platform, event.sessionId)
+        if not key[0] or not key[1]:
+            return
+
+        with self._lock:
+            queue = self._subscribers.get(key)
+
+        if queue is None:
+            logger.warning(
+                "No client subscriber for vault.paired platform=%s sessionId=%s",
+                event.platform,
+                event.sessionId,
+            )
+            return
+
+        try:
+            queue.put_nowait(event)
+        except asyncio.QueueFull:
+            logger.warning(
+                "SSE queue full for vault.paired platform=%s sessionId=%s",
+                event.platform,
+                event.sessionId,
+            )
+            return
+
+        logger.info(
+            "Delivered vault.paired platform=%s sessionId=%s userInstallId=%s",
+            event.platform,
+            event.sessionId,
+            event.userInstallId,
         )
 

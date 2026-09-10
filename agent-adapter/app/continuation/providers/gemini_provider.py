@@ -13,6 +13,33 @@ logger = get_logger(__name__)
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
 
 
+def wake_gemini_with_message(
+        *,
+        previous_interaction_id: str,
+        message: str,
+) -> str:
+    previous_interaction_id = previous_interaction_id.strip()
+    if not previous_interaction_id:
+        raise ValueError("previous_interaction_id is required")
+
+    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        raise ValueError(
+            "Missing GEMINI_API_KEY or GOOGLE_API_KEY in environment"
+        )
+
+    client = genai.Client(api_key=api_key)
+    interaction = client.interactions.create(
+        model=GEMINI_MODEL,
+        previous_interaction_id=previous_interaction_id,
+        input=message,
+    )
+    interaction_id = str(getattr(interaction, "id", "") or "").strip()
+    if not interaction_id:
+        raise RuntimeError("Gemini wake returned no interaction id")
+    return interaction_id
+
+
 class GeminiProvider(WakeProvider):
 
     def wake(
@@ -29,13 +56,6 @@ class GeminiProvider(WakeProvider):
                 "Pass the current interaction.id as sessionId when calling send_action."
             )
 
-        api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-
-        if not api_key:
-            raise ValueError(
-                "Missing GEMINI_API_KEY or GOOGLE_API_KEY in environment"
-            )
-
         message = (
             f"Bridge workflow update.\n"
             f"requestId: {notification.requestId}\n"
@@ -44,13 +64,10 @@ class GeminiProvider(WakeProvider):
             f"message: {notification.message}"
         )
 
-        client = genai.Client(api_key=api_key)
-
         try:
-            interaction = client.interactions.create(
-                model=GEMINI_MODEL,
+            interaction_id = wake_gemini_with_message(
                 previous_interaction_id=previous_interaction_id,
-                input=message,
+                message=message,
             )
         except Exception as error:
             logger.error(
@@ -64,12 +81,12 @@ class GeminiProvider(WakeProvider):
 
         workflow_service.update_continuation_context(
             notification.requestId,
-            interaction.id,
+            interaction_id,
         )
 
         logger.info(
             "Woke Gemini agent requestId=%s previous=%s new=%s",
             notification.requestId,
             previous_interaction_id,
-            interaction.id,
+            interaction_id,
         )
