@@ -181,22 +181,31 @@ class PairingWatcher:
             action_summary=action_summary,
         )
 
-        try:
-            resume_session_id = await asyncio.to_thread(
-                _wake_after_pairing,
-                platform=platform,
-                session_id=session_id,
-                user_install_id=user_install_id,
-                message=message,
-            )
-        except Exception as error:
-            logger.error(
-                "Pairing wake failed platform=%s sessionId=%s: %s",
-                platform,
+        resume_session_id = session_id
+        if platform == "openai":
+            # OpenAI client continues via vault.paired SSE + local tool loop.
+            # Skipping adapter wake avoids duplicate send_action calls.
+            logger.info(
+                "Pairing wake skipped for OpenAI; client will continue via SSE "
+                "sessionId=%s",
                 session_id,
-                error,
             )
-            return
+        else:
+            try:
+                resume_session_id = await asyncio.to_thread(
+                    _wake_after_pairing,
+                    platform=platform,
+                    session_id=session_id,
+                    user_install_id=user_install_id,
+                    message=message,
+                )
+            except Exception as error:
+                logger.error(
+                    "Pairing wake failed platform=%s sessionId=%s: %s",
+                    platform,
+                    session_id,
+                    error,
+                )
 
         self._client_notifier.notify_vault_paired(
             VaultPairedEvent(

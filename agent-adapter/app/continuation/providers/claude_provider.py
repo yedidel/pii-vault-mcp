@@ -8,6 +8,31 @@ from workflow.models import ContinuationNotification, WorkflowModel
 logger = get_logger(__name__)
 
 
+def wake_claude_with_message(
+        *,
+        wake_url: str,
+        message: str,
+        request_id: str,
+        workflow_id: str,
+        status: str,
+) -> str:
+    ingress = wake_url.strip()
+    if not ingress:
+        raise ValueError("wake_url is required")
+    if not is_allowed_claude_wake_url(ingress):
+        raise ValueError(f"Claude wake URL is not allowed: {ingress!r}")
+
+    payload = {
+        "requestId": request_id,
+        "workflowId": workflow_id,
+        "status": status,
+        "message": message,
+    }
+    response = requests.post(ingress, json=payload, timeout=5)
+    response.raise_for_status()
+    return ingress
+
+
 class ClaudeProvider(WakeProvider):
 
     def wake(
@@ -40,22 +65,14 @@ class ClaudeProvider(WakeProvider):
                 f"Claude wake URL is not allowed: {ingress!r}"
             )
 
-        payload = {
-            "requestId": notification.requestId,
-            "workflowId": notification.workflowId,
-            "status": notification.status,
-            "message": notification.message,
-        }
-
         try:
-            response = requests.post(
-                ingress,
-                json=payload,
-                timeout=5,
+            wake_claude_with_message(
+                wake_url=ingress,
+                message=notification.message,
+                request_id=notification.requestId,
+                workflow_id=notification.workflowId,
+                status=notification.status,
             )
-
-            response.raise_for_status()
-
         except requests.RequestException as error:
             raise RuntimeError(
                 f"Failed to wake Claude agent "

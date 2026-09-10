@@ -13,6 +13,29 @@ logger = get_logger(__name__)
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6")
 
 
+def wake_openai_with_message(
+        *,
+        conversation_id: str,
+        message: str,
+) -> str:
+    conversation_id = conversation_id.strip()
+    if not conversation_id:
+        raise ValueError("conversation_id is required")
+
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise ValueError("Missing OPENAI_API_KEY in environment")
+
+    client = OpenAI(api_key=api_key)
+    client.responses.create(
+        model=OPENAI_MODEL,
+        conversation=conversation_id,
+        input=message,
+        parallel_tool_calls=False,
+    )
+    return conversation_id
+
+
 class OpenAIProvider(WakeProvider):
 
     def wake(
@@ -47,13 +70,10 @@ class OpenAIProvider(WakeProvider):
             f"message: {notification.message}"
         )
 
-        client = OpenAI(api_key=api_key)
-
         try:
-            response = client.responses.create(
-                model=OPENAI_MODEL,
-                conversation=conversation_id,
-                input=message,
+            wake_openai_with_message(
+                conversation_id=conversation_id,
+                message=message,
             )
         except Exception as error:
             logger.error(
@@ -64,8 +84,7 @@ class OpenAIProvider(WakeProvider):
             raise
 
         logger.info(
-            "Woke OpenAI agent requestId=%s conversation=%s response=%s",
+            "Woke OpenAI agent requestId=%s conversation=%s",
             notification.requestId,
             conversation_id,
-            response.id,
         )

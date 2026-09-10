@@ -114,6 +114,22 @@ def _extract_function_calls(response: Any) -> list[Any]:
     ]
 
 
+def _session_instructions(conversation_id: str) -> str:
+    return (
+        SYSTEM_INSTRUCTIONS
+        + f"\n\nCurrent conversation.id (use as send_action sessionId): "
+        + conversation_id
+    )
+
+
+def _pairing_continue_message(user_install_id: str) -> str:
+    return (
+        "Vault pairing completed successfully.\n"
+        f"userInstallId: {user_install_id}\n"
+        "Call send_action now with the same parameters as before to continue."
+    )
+
+
 async def _run_tool_loop(
         *,
         openai_client: OpenAI,
@@ -121,17 +137,20 @@ async def _run_tool_loop(
         conversation_id: str,
         model: str,
         user_input: str | list[dict[str, Any]],
+        include_instructions: bool = True,
 ) -> Any:
     tools = bridge.openai_tools
-    response = openai_client.responses.create(
-        model=model,
-        conversation=conversation_id,
-        instructions=SYSTEM_INSTRUCTIONS
-        + f"\n\nCurrent conversation.id (use as send_action sessionId): "
-        + conversation_id,
-        input=user_input,
-        tools=tools or None,
-    )
+    create_kwargs: dict[str, Any] = {
+        "model": model,
+        "conversation": conversation_id,
+        "input": user_input,
+        "tools": tools or None,
+        "parallel_tool_calls": False,
+    }
+    if include_instructions:
+        create_kwargs["instructions"] = _session_instructions(conversation_id)
+
+    response = openai_client.responses.create(**create_kwargs)
 
     for _ in range(MAX_TOOL_TURNS):
         function_calls = _extract_function_calls(response)
@@ -150,6 +169,8 @@ async def _run_tool_loop(
                 arguments = {}
 
             output = await bridge.call_tool(name, arguments)
+            if not isinstance(output, str):
+                output = json.dumps(output, ensure_ascii=False)
 
             tool_outputs.append(
                 {
@@ -159,14 +180,14 @@ async def _run_tool_loop(
                 }
             )
 
+        # Submit tool outputs on the conversation so Adapter wakes can append
+        # later without hitting orphaned function_call items.
         response = openai_client.responses.create(
             model=model,
             conversation=conversation_id,
-            instructions=SYSTEM_INSTRUCTIONS
-            + f"\n\nCurrent conversation.id (use as send_action sessionId): "
-            + conversation_id,
             input=tool_outputs,
             tools=tools or None,
+            parallel_tool_calls=False,
         )
 
     print(
@@ -209,12 +230,51 @@ async def chat_loop(
     print(f"bridge events   = {events_url}")
     print("Type a message. Ctrl+C or empty line to exit.\n")
 
-    async def on_workflow_updated(payload: dict[str, Any]) -> None:
+    async def on_client_event(payload: dict[str, Any]) -> None:
         nonlocal item_cursor
+        event_type = str(payload.get("type") or "workflow.updated").strip()
+        if event_type == "vault.paired":
+            user_install_id = str(payload.get("userInstallId") or "").strip()
+            print(f"\nvault> paired userInstallId={user_install_id}")
+            try:
+                response = await _run_tool_loop(
+                    openai_client=openai_client,
+                    bridge=bridge,
+                    conversation_id=conversation_id,
+                    model=model,
+                    user_input=_pairing_continue_message(user_install_id),
+                    include_instructions=False,
+                )
+            except Exception as error:
+                message = str(error)
+                if "No tool output found for function call" in message:
+                    print(
+                        "\nerror> OpenAI conversation has a stale tool call. "
+                        "Run with --reset-conversation and try again.\n",
+                        file=sys.stderr,
+                    )
+                else:
+                    print(
+                        f"\nerror> continue after pairing failed: {error}\n",
+                        file=sys.stderr,
+                    )
+            else:
+                _print_assistant(getattr(response, "output_text", "") or "")
+
+            async with cursor_lock:
+                item_cursor = await asyncio.to_thread(
+                    latest_conversation_item_id,
+                    openai_client,
+                    conversation_id,
+                )
+            print("you> ", end="", flush=True)
+            return
+
         print(
             f"\nworkflow> status={payload.get('status')} "
             f"requestId={payload.get('requestId')}"
         )
+
         async with cursor_lock:
             items, item_cursor = await asyncio.to_thread(
                 fetch_new_conversation_items,
@@ -235,7 +295,7 @@ async def chat_loop(
                 platform="openai",
                 session_id=conversation_id,
                 token=sse_token,
-                on_event=on_workflow_updated,
+                on_event=on_client_event,
             ),
             name="bridge-client-events",
         )
@@ -253,13 +313,23 @@ async def chat_loop(
                 if not user_text:
                     break
 
-                response = await _run_tool_loop(
-                    openai_client=openai_client,
-                    bridge=bridge,
-                    conversation_id=conversation_id,
-                    model=model,
-                    user_input=user_text,
-                )
+                try:
+                    response = await _run_tool_loop(
+                        openai_client=openai_client,
+                        bridge=bridge,
+                        conversation_id=conversation_id,
+                        model=model,
+                        user_input=user_text,
+                    )
+                except Exception as error:
+                    message = str(error)
+                    if "No tool output found for function call" in message:
+                        print(
+                            "\nerror> OpenAI conversation has a stale tool call. "
+                            "Run with --reset-conversation and try again.\n",
+                            file=sys.stderr,
+                        )
+                    raise
                 _print_assistant(getattr(response, "output_text", "") or "")
 
                 # Advance cursor past items produced by this interactive turn
