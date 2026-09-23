@@ -1,0 +1,5 @@
+{
+  "name": "bridge-interaction",
+  "version": "0.1.0",
+  "description": "Owns the initial Gemini Interactions id for Bridge send_action via CLI hooks."
+}

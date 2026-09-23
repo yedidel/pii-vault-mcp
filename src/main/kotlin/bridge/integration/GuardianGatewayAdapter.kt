@@ -20,10 +20,7 @@ class GuardianGatewayAdapter(
     private val logger = LoggerFactory.getLogger(javaClass)
 
     private val guardianAuthUrl =
-        "http://localhost:8001/v1/authenticate/agent?did="
-
-    private val guardianReportUrl =
-        "http://localhost:8001/v1/report"
+        "${guardianBaseUrl()}/v1/authenticate/agent?did="
 
     override fun verifyAgent(
         workflowId: String,
@@ -78,35 +75,13 @@ class GuardianGatewayAdapter(
         }
     }
 
-    fun verifyAgentSync(agentId: String): Boolean {
-        return try {
-            val auth = restTemplate.getForObject(
-                "$guardianAuthUrl$agentId",
-                AuthResponse::class.java
-            )
-
-            auth?.status == "verified"
-        } catch (_: Exception) {
-            false
+    companion object {
+        internal fun guardianBaseUrl(): String {
+            val raw = System.getenv("GUARDIAN_BASE_URL")
+                ?: System.getProperty("GUARDIAN_BASE_URL")
+                ?: "http://localhost:8001"
+            return raw.trim().trimEnd('/')
         }
-    }
-
-    fun reportOutcome(
-        requestId: String,
-        domain: String,
-        result: String
-    ) {
-        val payload = mapOf(
-            "domain" to domain,
-            "result" to result,
-            "requestId" to requestId
-        )
-
-        restTemplate.postForObject(
-            guardianReportUrl,
-            payload,
-            Map::class.java
-        )
     }
 }
 

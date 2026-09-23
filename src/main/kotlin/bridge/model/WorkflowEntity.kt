@@ -2,6 +2,7 @@ package bridge.model
 
 import bridge.workflow.WorkflowState
 import bridge.workflow.WorkflowStep
+import continuation.ConnectorType
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -31,11 +32,18 @@ class WorkflowEntity(
     @Column(name = "request_id", nullable = false, unique = true)
     val requestId: String,
 
-    @Column(name = "platform", nullable = false)
-    val platform: String,
+    /**
+     * connector used to continue the workflow.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "connector_type", nullable = false)
+    var connectorType: ConnectorType,
 
-    @Column(name = "agent_session_id", nullable = false)
-    var agentSessionId: String,
+    /**
+     * opaque data understood only by the connector.
+     */
+    @Column(name = "connector_context", nullable = false)
+    var connectorContext: String,
 
     @Enumerated(EnumType.STRING)
     @Column(name = "current_state", nullable = false)
@@ -58,9 +66,11 @@ class WorkflowEntity(
     @Column(name = "completed_at")
     var completedAt: LocalDateTime? = null,
 
+    // Unused by the live workflow. Kept for schema compatibility.
     @Column(name = "last_executed_command")
-    var lastExecutedCommand: String? = null
-) {
+    var lastExecutedCommand: String? = null,
+
+    ) {
 
     @PrePersist
     fun onCreate() {

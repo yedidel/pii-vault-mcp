@@ -6,42 +6,31 @@ import bridge.Bridge.*
 import bridge.model.ActionEntity
 import io.grpc.Status
 
-import bridge.integration.AuthResponse
-import bridge.integration.GuardianGatewayAdapter
 @Service
 
 class ActionService(
     private val actionRepository: ActionRepository,
-    private val objectMapper: ObjectMapper,
-    private val guardianAdapter: GuardianGatewayAdapter
+    private val objectMapper: ObjectMapper
 ) {
 
     /**
-     * Validates the request and checks if the agent is authorized.
+     * Validates the incoming request and persists a new action.
+     *
+     * Agent verification is performed later by the workflow engine.
      */
     fun handleAction(request: ActionRequest): ActionResponse {
-        // 1. Ask the Guardian if the Agent is authorized
-        if (!isAgentAuthorized(request.agentId)) {
-            println("--- [SECURITY] Agent ${request.agentId} is NOT authorized by Guardian ---")
-            throw Status.UNAUTHENTICATED
-                .withDescription("Agent not authorized by The Guardian")
-                .asException()
-        }
 
-        // 2. Continue with existing logic (Legal action check, Parameters, etc.)
+
+        // Validate the requested action type.
         val actionType = request.actionType.uppercase()
         if (!isLegalAction(actionType)) return failure("Unknown action type $actionType")
+
+        val sensitiveError = FillFormParameterPolicy.validate(actionType, request.parametersMap)
+        if (sensitiveError != null) return failure(sensitiveError)
 
         return processAction(request)
     }
 
-    /**
-     * Checks with The Guardian (Project C) if the Agent is legitimate.
-     * Uses the Agent's Identity (DID) to verify credentials.
-     */
-    private fun isAgentAuthorized(agentId: String): Boolean {
-        return guardianAdapter.verifyAgentSync(agentId)
-    }
 
     /**
      * Checks whether the requested action type is supported by the system.
@@ -50,18 +39,6 @@ class ActionService(
         return actionType in allowedActionTypes
     }
 
-    /**
-     * Validates that the parameters provided in the request
-     * match the required parameters for the given action type.
-     */
-    private fun validateParameters(actionType: String, parameters: Map<String, String>): Boolean {
-        return when (actionType) {
-            "PAYMENT" -> parameters.containsKey("amount") && parameters.containsKey("currency")
-            "TRANSACTION" -> parameters.containsKey("amount") && parameters.containsKey("currency") && parameters.containsKey("target")
-            "FILL_FORM" -> parameters.containsKey("id") && parameters.containsKey("email") && parameters.containsKey("password") && parameters.containsKey("name")
-            else -> false
-        }
-    }
 
     /**
      * Processes an action request with idempotency logic.
@@ -115,7 +92,7 @@ class ActionService(
         return ActionResponse.newBuilder()
             .setRequestId(requestId)
             .setStatus(StatusType.RECEIVED)
-            .setDescription("Action identity verified and request accepted")
+            .setDescription("Action received successfully")
             .build()
     }
     /**
@@ -177,12 +154,5 @@ class ActionService(
         actionRepository.save(action)
         println("--- [DB] Persistence Update: Action $requestId transitioned to $finalStatus ---")
     }
-    /**
-     * Data model for the Guardian's response.
-     * Maps the JSON fields from the Project C REST API.
-     */
-    data class TrustInfo(
-        val status: String = "unknown",
-        val trust_score: Double = 0.0
-    )
+
 }

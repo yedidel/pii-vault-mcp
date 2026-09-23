@@ -1,6 +1,5 @@
-import bridge_pb2
-print(bridge_pb2.__file__)
-from models import ActionRequestModel
+from bridge import bridge_pb2
+from workflow.models import ActionRequestModel
 
 # Mapper function to convert ActionRequestModel to ActionRequest protobuf message
 def map_to_proto(model: ActionRequestModel):
@@ -10,8 +9,8 @@ def map_to_proto(model: ActionRequestModel):
     proto.agent_id = model.agentId
     proto.user_install_id = model.userInstallId
     proto.action_type = model.actionType
-    proto.platform=model.platform
-    proto.session_id=model.sessionId
+    proto.connector_type = model.connectorType
+    proto.connector_context = model.connectorContext
 
     for key, value in model.parameters.items():
         proto.parameters[key] = value

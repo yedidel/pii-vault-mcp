@@ -22,7 +22,7 @@ class ActionEntity(
     @Column(name = "parameters_json", columnDefinition = "jsonb")
     val parametersJson: String? = null,
 
-    // Stores the full context of the request so the process can be resumed later after approval or delay
+    // Unused by the live workflow. Kept for schema compatibility.
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "context_json", columnDefinition = "jsonb")
     val contextJson: String? = null,

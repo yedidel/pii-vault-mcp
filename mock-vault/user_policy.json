@@ -1,0 +1,17 @@
+{
+  "userInstallId": "install_ea12eba4b2844839940bd03ef2400c72",
+  "unknownField": "VAULT_ONLY",
+  "actions": {
+    "PAYMENT": "USER_APPROVAL",
+    "TRANSACTION": "USER_APPROVAL",
+    "FILL_FORM": "POLICY_BASED",
+    "SEARCH_PRODUCT": "AGENT_ALLOWED"
+  },
+  "fields": {
+    "name": "AGENT_ALLOWED",
+    "phone": "VAULT_ONLY",
+    "email": "VAULT_ONLY",
+    "password": "VAULT_ONLY",
+    "ssn": "VAULT_ONLY"
+  }
+}

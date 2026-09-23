@@ -5,7 +5,9 @@ import java.time.Instant
 import java.util.UUID
 
 /**
- * Published after workflow execution fails.
+ * Legacy Kafka payload type. Not published by the active workflow.
+ * Terminal NotifyAgent is issued from ACTION_RESPONSE_RECEIVED / GUARDIAN_REJECTED.
+ * Kept so leftover bus messages can be deserialized and ignored.
  */
 data class WorkflowFailedEvent(
 

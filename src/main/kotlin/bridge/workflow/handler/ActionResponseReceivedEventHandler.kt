@@ -1,10 +1,15 @@
 package bridge.workflow.handler
 
 import bridge.Bridge.StatusType
-import bridge.workflow.*
+import bridge.workflow.NotifyAgentCommand
+import bridge.workflow.TransitionCommand
+import bridge.workflow.UpdateActionStatusCommand
+import bridge.workflow.WorkflowContext
+import bridge.workflow.WorkflowDecision
+import bridge.workflow.WorkflowEventType
+import bridge.workflow.WorkflowState
+import bridge.workflow.WorkflowStep
 import bridge.workflow.events.ActionResponseReceivedEvent
-import bridge.workflow.events.WorkflowCompletedEvent
-import bridge.workflow.events.WorkflowFailedEvent
 import org.springframework.stereotype.Component
 
 @Component
@@ -38,14 +43,6 @@ class ActionResponseReceivedEventHandler :
                         resultData = event.resultData
                     ),
 
-                    PublishEventCommand(
-                        WorkflowCompletedEvent(
-                            workflowId = event.workflowId,
-                            requestId = event.requestId,
-                            context = event.context
-                        )
-                    ),
-
                     NotifyAgentCommand(
                         requestId = event.requestId,
                         message = "Action completed successfully"
@@ -68,15 +65,6 @@ class ActionResponseReceivedEventHandler :
                         requestId = event.requestId,
                         status = StatusType.REJECTED,
                         resultData = event.resultData
-                    ),
-
-                    PublishEventCommand(
-                        WorkflowFailedEvent(
-                            workflowId = event.workflowId,
-                            requestId = event.requestId,
-                            context = event.context,
-                            failureReason = event.resultData ?: "Vault rejected action"
-                        )
                     ),
 
                     NotifyAgentCommand(
@@ -102,15 +90,6 @@ class ActionResponseReceivedEventHandler :
                         status = StatusType.FAILED,
                         resultData = event.resultData
                             ?: "Unhandled Vault status: ${event.responseStatus}"
-                    ),
-
-                    PublishEventCommand(
-                        WorkflowFailedEvent(
-                            workflowId = event.workflowId,
-                            requestId = event.requestId,
-                            context = event.context,
-                            failureReason = "Unhandled Vault status: ${event.responseStatus}"
-                        )
                     ),
 
                     NotifyAgentCommand(

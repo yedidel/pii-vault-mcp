@@ -1,0 +1,7 @@
+{
+  "name": "bridge-interaction",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Gemini CLI hooks that own the initial Bridge Interaction id."
+}

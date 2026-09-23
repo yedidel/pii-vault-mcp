@@ -25,6 +25,20 @@ class WorkflowEngine(
 
         val context = contextLoader.load(event.workflowId)
 
+        if (
+            event.eventType == WorkflowEventType.WORKFLOW_COMPLETED ||
+            event.eventType == WorkflowEventType.WORKFLOW_FAILED
+        ) {
+            println(
+                """
+                Ignoring leftover ${event.eventType} (not part of the active workflow)
+                Workflow : ${event.workflowId}
+                State    : ${context.currentState}
+                """.trimIndent()
+            )
+            return
+        }
+
         if (!transitionValidator.shouldProcessEvent(context.currentState, event.eventType)) {
             println(
                 """
@@ -48,7 +62,7 @@ class WorkflowEngine(
 
         val decision = typedHandler.handle(context, event)
 
-        commandExecutor.execute(decision)
+        commandExecutor.execute(context, decision)
 
         println("--- [WORKFLOW] Event processing completed for workflow: ${event.workflowId} ---")
     }
@@ -106,28 +120,20 @@ class WorkflowEngine(
                 WorkflowState.WAITING_FOR_VAULT_RESPONSE ->
                     WorkflowDecision(
                         commands = listOf(
-                            RequestVaultEvaluationCommand(
+                            VaultEvaluationCommandFactory.fromContext(
                                 workflowId = context.workflowId,
                                 requestId = context.requestId,
-                                amount = context.actionContext.parameters["amount"] ?: "",
-                                currency = context.actionContext.parameters["currency"] ?: ""
+                                context = context.actionContext,
                             )
                         )
                     )
-
-                WorkflowState.IN_PROGRESS -> {
-                    println(
-                        "--- [WORKFLOW RECOVERY] Workflow is IN_PROGRESS. No recovery command defined yet for ${context.workflowId} ---"
-                    )
-                    WorkflowDecision(emptyList())
-                }
 
                 WorkflowState.COMPLETED,
                 WorkflowState.FAILED ->
                     WorkflowDecision(emptyList())
             }
 
-        commandExecutor.execute(decision)
+        commandExecutor.execute(context,decision)
 
         println("--- [WORKFLOW RECOVERY] Resume completed for workflow: ${context.workflowId} ---")
     }

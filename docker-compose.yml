@@ -6,10 +6,8 @@ services:
     image: postgres:15
     container_name: bridge-postgres
     restart: always
-    environment:
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=bridge_db
+    env_file:
+      - agent-adapter/.env
     ports:
       - "5432:5432"
 

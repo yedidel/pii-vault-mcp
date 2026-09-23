@@ -1,6 +1,6 @@
 import grpc
-import bridge_pb2
-import bridge_pb2_grpc
+from bridge import bridge_pb2, bridge_pb2_grpc
+
 
 def send_action():
     # Initialize the gRPC channel to the Kotlin server

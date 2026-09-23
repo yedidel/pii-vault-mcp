@@ -1,44 +1,86 @@
 syntax = "proto3";
+
 package bridge;
+
 import "google/protobuf/timestamp.proto";
 
 service BridgeService {
-  rpc SendAction (ActionRequest) returns (ActionResponse);
-  rpc GetActionStatus (StatusRequest) returns (StatusResponse);
+  rpc SendAction(ActionRequest) returns (ActionResponse);
+  rpc GetActionStatus(StatusRequest) returns (StatusResponse);
+  // Query-only: Vault evaluates current user privacy policy.
+  // Does not create an action or workflow. Technical failures use gRPC
+  // status codes, not a privacy decision enum.
+  rpc EvaluatePolicy(PolicyEvaluationRequest) returns (PolicyEvaluationResponse);
 }
+
 message ActionRequest {
   string agent_id = 1;
-  string user_install_id = 2; //id that of app on specific device, used to send push notifications to the user
+
+  // ID of the application installation on the user's device.
+  string user_install_id = 2;
+
   string action_type = 3;
+
   map<string, string> parameters = 4;
-  string platform=5;
-  string session_id=6;
+
+  // Connector responsible for resuming the workflow.
+  string connector_type = 5;
+
+  // Opaque data understood only by the connector
+  // (session id, thread id, webhook url, etc.).
+  string connector_context = 6;
 }
-//answer to the initial request, with the generated UUID and initial status
+
+// Initial response returned immediately after the action is accepted.
 message ActionResponse {
   string request_id = 1;
   StatusType status = 2;
   string description = 3;
+  // Authoritative Bridge workflow id for this action.
+  string workflow_id = 4;
 }
-//request to check the status of a specific action
+
+// Request the current status of an asynchronous action.
 message StatusRequest {
   string request_id = 1;
 }
-//response with the current status of the action and any relevant data
+
+// Current action status.
 message StatusResponse {
   string request_id = 1;
   StatusType status = 2;
   string result_data = 3;
-  google.protobuf.Timestamp updated_at = 4; //to indicate when the status was last updated, useful for clients to know if they should check again later
+  google.protobuf.Timestamp updated_at = 4;
 }
+
+// Field NAMES only. Never send field values.
+message PolicyEvaluationRequest {
+  string agent_id = 1;
+  string user_install_id = 2;
+  string action_type = 3;
+  repeated string field_names = 4;
+}
+
+// decision is only set on success:
+// AGENT_ALLOWED | VAULT_ONLY | USER_APPROVAL | PARTIAL
+message PolicyEvaluationResponse {
+  string policy_request_id = 1;
+  string action_type = 2;
+  string decision = 3;
+  repeated string agent_allowed = 4;
+  repeated string vault_required = 5;
+  bool user_approval_required = 6;
+}
+
 enum StatusType {
-  STATUS_TYPE_UNSPECIFIED = 0;//default
-  RECEIVED = 1;//the request received by bridge
-  WAITING_FOR_USER = 2; //wait for approve by the user from volet
-  IN_PROGRESS = 3;//between volet and approve by gard
-  COMPLETED = 4;//the action completed
-  FAILED = 5;//the action completed with fail
-  REJECTED = 6;//reject by gard
-  EXPIRED = 7;//TODO:check if necessary
-  FAILED_APP_NOT_INSTALLED = 8;//app not install
+  STATUS_TYPE_UNSPECIFIED = 0;
+
+  RECEIVED = 1;
+  WAITING_FOR_USER = 2;
+  IN_PROGRESS = 3;
+  COMPLETED = 4;
+  FAILED = 5;
+  REJECTED = 6;
+  EXPIRED = 7;
+  FAILED_APP_NOT_INSTALLED = 8;
 }

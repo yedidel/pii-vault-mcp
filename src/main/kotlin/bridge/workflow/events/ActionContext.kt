@@ -1,5 +1,7 @@
 package bridge.workflow.events
 
+import continuation.ConnectorType
+
 /**
  * Immutable context describing the action that initiated the workflow.
  *
@@ -23,17 +25,18 @@ data class ActionContext(
     val actionType: String,
 
     /**
-     * Platform from which the action originated.
+     * Connector used to continue the workflow.
      */
-    val platform: String,
+    val connectorType: ConnectorType,
 
     /**
-     * External agent session identifier.
+     * Opaque context understood only by the connector
+     * (session id, thread id, webhook url, etc.).
      */
-    val sessionId: String,
+    val connectorContext: String,
 
     /**
      * Immutable action parameters.
      */
-    val parameters: Map<String, String>
+    val parameters: Map<String, String>,
 )

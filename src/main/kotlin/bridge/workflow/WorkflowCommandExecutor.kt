@@ -1,11 +1,12 @@
 package bridge.workflow
 
 import bridge.ActionService
-import bridge.integration.AgentGateway
 import bridge.integration.GuardianGateway
 import bridge.integration.VaultGateway
 import bridge.workflow.publisher.WorkflowEventPublisher
 import bridge.workflow.state.WorkflowTransitionService
+import continuation.ContinuationRequest
+import continuation.WorkflowContinuationService
 import org.springframework.stereotype.Component
 
 @Component
@@ -19,26 +20,39 @@ class WorkflowCommandExecutor(
 
     private val workflowEventPublisher: WorkflowEventPublisher,
 
-    private val agentGateway: AgentGateway,
+    private val workflowContinuationService: WorkflowContinuationService,
 
-    private val actionService: ActionService
+    private val actionService: ActionService,
 
-) {
+    ) {
 
-    fun execute(decision: WorkflowDecision) {
-        decision.commands.forEach(::execute)
+    fun execute(
+        context: WorkflowContext,
+        decision: WorkflowDecision,
+    ) {
+        decision.commands.forEach {
+            println("Executing command: ${it::class.simpleName}")
+            execute(context, it)
+        }
     }
 
-    private fun execute(command: WorkflowCommand) {
+    private fun execute(
+        context: WorkflowContext,
+        command: WorkflowCommand,
+    ) {
 
         when (command) {
 
             is TransitionCommand -> {
-                transitionService.transition(
+                val updated = transitionService.transition(
                     workflowId = command.workflowId,
                     nextState = command.nextState,
-                    nextStep = command.nextStep
+                    nextStep = command.nextStep,
                 )
+                // Keep the in-memory context aligned so later commands in
+                // the same decision (e.g. NotifyAgent) see the new state.
+                context.currentState = updated.currentState
+                context.currentStep = updated.currentStep
             }
 
             is PublishEventCommand -> {
@@ -49,23 +63,27 @@ class WorkflowCommandExecutor(
                 guardianGateway.verifyAgent(
                     workflowId = command.workflowId,
                     requestId = command.requestId,
-                    context = command.context
+                    context = command.context,
                 )
             }
 
             is RequestVaultEvaluationCommand -> {
-                vaultGateway.requestApproval(
-                    workflowId = command.workflowId,
-                    requestId = command.requestId,
-                    amount = command.amount,
-                    currency = command.currency
-                )
+                vaultGateway.requestEvaluation(command)
             }
 
             is NotifyAgentCommand -> {
-                agentGateway.notify(
+
+                val request = ContinuationRequest(
+                    workflowId = context.workflowId,
                     requestId = command.requestId,
-                    message = command.message
+                    connectorContext = context.actionContext.connectorContext,
+                    status = context.currentState.name,
+                    message = command.message,
+                )
+
+                workflowContinuationService.continueWorkflow(
+                    connectorType = context.actionContext.connectorType,
+                    request = request,
                 )
             }
 
@@ -73,7 +91,7 @@ class WorkflowCommandExecutor(
                 actionService.updateActionStatus(
                     requestId = command.requestId,
                     finalStatus = command.status,
-                    resultData = command.resultData
+                    resultData = command.resultData,
                 )
             }
         }

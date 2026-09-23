@@ -1,4 +1,5 @@
 package bridge.workflow
+
 import bridge.workflow.events.ActionContext
 
 /**
@@ -17,5 +18,5 @@ data class WorkflowContext(
 
     var currentState: WorkflowState,
 
-    var currentStep: WorkflowStep
+    var currentStep: WorkflowStep,
 )

@@ -26,12 +26,14 @@ enum class WorkflowEventType {
     ACTION_RESPONSE_RECEIVED,
 
     /**
-     * Workflow completed successfully.
+     * Legacy bus type. Not published by the active workflow.
+     * Kept so leftover Kafka messages can be deserialized and ignored.
      */
     WORKFLOW_COMPLETED,
 
     /**
-     * Workflow failed.
+     * Legacy bus type. Not published by the active workflow.
+     * Kept so leftover Kafka messages can be deserialized and ignored.
      */
     WORKFLOW_FAILED
 }
