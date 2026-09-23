@@ -138,7 +138,7 @@ With the demo policy, `name` is `AGENT_ALLOWED` and `email` and `password` are `
 | `agent-adapter/gemini-client/` | Interactive Gemini client |
 | `agent-adapter/claude-channel/` | `bridge-wake` MCP channel used by Claude Code |
 | `agent-adapter/shared_client/` | Shared HTTP auth and SSE helpers |
-| `agent-adapter/gemini-bridge-hooks/` | Optional Gemini CLI hook experiments |
+| `agent-adapter/gemini-bridge-hooks/` | Optional Gemini CLI hook integration. The documented interactive client is `gemini-client/client.py` |
 | `bridge-sdk/` | Small Python SDK that calls the Adapter over MCP |
 | `guardian-mock/` | Demo Guardian HTTP service |
 | `mock-vault/` | Demo Vault, privacy UI, and policy tests |
@@ -153,7 +153,7 @@ Python gRPC stubs under `agent-adapter/app/bridge/` are generated from that prot
 | Tool | Notes |
 | --- | --- |
 | Git | Clone and update the repository |
-| Java 21 | The project is developed with Java 21. Spring Boot 3.2 requires Java 17 or newer. Use the Gradle wrapper. A global Gradle install is not required |
+| Java 21 | Used by the Bridge. The project uses the included Gradle wrapper. A global Gradle install is not required |
 | Python 3.10 or newer | Adapter, clients, mocks, and SDK |
 | Node.js 20 or newer and npm | Claude channel only |
 | Docker and Docker Compose | PostgreSQL, Kafka, and Kafka UI |
@@ -496,7 +496,7 @@ Fill the demo registration form. My name is Alice.
 
 Live calls depend on the Gemini API and its quota. A quota failure is not a Bridge defect.
 
-`agent-adapter/gemini-bridge-hooks/` contains optional Gemini CLI experiments. The supported interactive path is `gemini-client/client.py`.
+`agent-adapter/gemini-bridge-hooks/` is an optional Gemini CLI hook integration. The primary documented interactive path is `agent-adapter/gemini-client/client.py`.
 
 ## Using Claude Code
 
@@ -549,15 +549,17 @@ claude --dangerously-load-development-channels server:bridge-wake
 
 `server:bridge-wake` matches the name in `.mcp.json`. The flag bypasses the curated channel allowlist for that server. It does not disable Adapter authentication.
 
-In the session, confirm both servers are connected, then ask Claude to call `get_continuation_context` before `send_action`. The returned `continuationUrl` looks like `http://127.0.0.1:8000/continuation/<uuid>` and is the `sessionId` argument for `platform=claude`.
+`get_continuation_context` is a `bridge-wake` tool. It is part of the Claude session protocol, not an Adapter MCP tool and not a value an end user types for each request. Claude Code calls it so the channel can register a continuation URL before `send_action`. Someone testing the integration can ask Claude, once in that session, to call it and then call `send_action`. The returned `continuationUrl` is `http://127.0.0.1:8000/continuation/<uuid>`. Claude passes that URL as `sessionId` when `platform` is `claude`.
 
-When the workflow completes, the path is:
+The completion path does not use the Bridge `CHANNEL` connector:
 
-1. Bridge sends the signed webhook to the Adapter.
-2. `ClaudeProvider` sends the bearer token to `POST /continuation/<uuid>`.
-3. The Adapter looks up the channel ingress and calls `POST /wake`.
-4. `bridge-wake` writes `notifications/claude/channel` to the Claude Code session that spawned it.
-5. Claude Code shows the channel event and can continue without a new user message.
+1. Claude Code calls Adapter tools through `bridge-adapter`.
+2. The Adapter starts a Bridge workflow.
+3. The Bridge sends the signed completion webhook to the Adapter.
+4. `ClaudeProvider` sends the bearer token to `POST /continuation/<uuid>`.
+5. The Adapter looks up the channel ingress and calls `POST /wake` on `bridge-wake`.
+6. `bridge-wake` writes `notifications/claude/channel` to the Claude Code session that spawned it.
+7. Claude Code shows the channel event and can continue without a new user message.
 
 A direct `POST /wake` from outside that Claude process does not appear in a different Claude session. The notification is delivered on the stdio pipe of the `bridge-wake` process Claude started.
 
@@ -604,7 +606,7 @@ Pay 100 ILS.
 Record transaction TX-100 on account ACC-1.
 ```
 
-Parameters are `transactionId` and `account`. The demo policy marks `TRANSACTION` as `USER_APPROVAL`.
+`TRANSACTION` is a supported `send_action` type. The Adapter tool schema names the parameters `transactionId` and `account`, and it does not require them. The Bridge stores the parameter map. The current Vault path for every action other than `FILL_FORM` is a payment request built from `amount` and `currency` only, so `transactionId` and `account` are not forwarded. The demo policy marks `TRANSACTION` as `USER_APPROVAL`. A successful evaluation lets the action continue into Guardian and that Vault payment request.
 
 ### Policy inspection
 
@@ -666,9 +668,14 @@ Run unit tests without Docker. Integration and live provider tests need the serv
 
 ### Offline / unit tests
 
-macOS / Linux, from the repository root, with the virtual environment active:
+These commands do not call OpenAI or Gemini. Activate the virtual environment first.
+
+Adapter tests import modules from `agent-adapter/app`, so the working directory matters.
+
+macOS / Linux:
 
 ```bash
+cd agent-adapter/app
 python -m unittest \
   test_action_policy_gate \
   test_claude_wake_auth \
@@ -680,29 +687,76 @@ python -m unittest \
   test_sse_queue \
   test_unknown_provider \
   test_webhook_hmac \
-  test_gemini_wake
+  test_gemini_wake.DescribeGeminiErrorTest \
+  test_gemini_wake.GeminiWakePayloadTest \
+  test_gemini_wake.GeminiProviderWakeTest \
+  test_gemini_wake.WakeDispatcherSseTest \
+  test_gemini_wake.WorkflowCompletionReachesGeminiTest
+cd ../..
 ```
 
-Run that command from `agent-adapter/app`.
+Windows PowerShell:
 
-OpenAI and Gemini client unit tests, still offline:
+```powershell
+cd agent-adapter\app
+python -m unittest `
+  test_action_policy_gate `
+  test_claude_wake_auth `
+  test_evaluate_user_policy `
+  test_fill_form_policy `
+  test_pairing_pending_reuse `
+  test_pending_evict `
+  test_pii_sanitize `
+  test_sse_queue `
+  test_unknown_provider `
+  test_webhook_hmac `
+  test_gemini_wake.DescribeGeminiErrorTest `
+  test_gemini_wake.GeminiWakePayloadTest `
+  test_gemini_wake.GeminiProviderWakeTest `
+  test_gemini_wake.WakeDispatcherSseTest `
+  test_gemini_wake.WorkflowCompletionReachesGeminiTest
+cd ..\..
+```
+
+`test_gemini_wake.GeminiLiveWakeTest` is not in that list. It calls the live Gemini API when a key is present. It is described under live provider tests.
+
+The remaining commands run from the repository root.
+
+OpenAI and Gemini client unit tests, still offline. macOS / Linux:
 
 ```bash
 python -m unittest discover -s agent-adapter/openai-client -p 'test_*.py'
 python -m unittest discover -s agent-adapter/gemini-client -p 'test_*.py'
 ```
 
-Mock Vault:
+Windows PowerShell:
+
+```powershell
+python -m unittest discover -s agent-adapter\openai-client -p 'test_*.py'
+python -m unittest discover -s agent-adapter\gemini-client -p 'test_*.py'
+```
+
+Mock Vault, from the repository root. The same command works in Bash and PowerShell:
 
 ```bash
 python -m unittest discover -s mock-vault -p 'test_*.py'
 ```
 
-Bridge SDK:
+Bridge SDK offline tests, from the repository root.
+
+macOS / Linux:
 
 ```bash
-python bridge-sdk/tests/run_tests.py
+python bridge-sdk/tests/run_tests.py --offline-only
 ```
+
+Windows PowerShell:
+
+```powershell
+python bridge-sdk\tests\run_tests.py --offline-only
+```
+
+Without `--offline-only`, the same runner also probes a local Adapter, Install Directory, and Bridge. Those checks are skipped when the stack is down. They are not part of the offline set.
 
 Bridge:
 
@@ -733,7 +787,7 @@ PowerShell can use the same `npm` commands. They do not need Bash.
 
 ### Live provider tests
 
-`agent-adapter/app/test_e2e_wake_resume.py` calls the Gemini API and a running stack. Run it only when you intend to spend API quota. Provider HTTP 429 and quota errors are external. They do not by themselves show a Bridge failure.
+`agent-adapter/app/test_e2e_wake_resume.py` calls the Gemini API and a running stack. `test_gemini_wake.GeminiLiveWakeTest` also calls the Gemini API when `GEMINI_API_KEY` or `GOOGLE_API_KEY` is set. Run either only when you intend to spend API quota. Provider HTTP 429 and quota errors are external. They do not by themselves show a Bridge failure.
 
 The OpenAI and Gemini chat clients are manual live tests. Start the stack, then start the client and send one of the example prompts.
 
@@ -802,4 +856,4 @@ Get-NetTCPConnection -LocalPort 8000 -State Listen
 
 ## Project context
 
-THE BRIDGE is an academic final project about secure mediation and process orchestration for AI agents. The source in this repository is the description of what the system does.
+THE BRIDGE is an academic final project about secure mediation and process orchestration for AI agents. The implementation in this repository serves as the authoritative reference for the system's current behavior.
