@@ -11,11 +11,13 @@ scanBasePackages = [
 "continuation"
 ]
 )
-/**
- * Required to activate the background task scheduler for heartbeats.
- */
 @EnableScheduling
 class BridgeServerApplication
+
+fun grpcListenPort(): Int {
+    val raw = System.getenv("GRPC_PORT") ?: System.getProperty("GRPC_PORT")
+    return raw?.toIntOrNull() ?: 50051
+}
 
 fun main() {
     EnvLoader.loadFromRepoEnvFile()
@@ -25,13 +27,14 @@ fun main() {
     val context = runApplication<BridgeServerApplication>()
     // Get the BridgeServiceImpl bean created and managed by Spring
     val bridgeService = context.getBean(BridgeServiceImpl::class.java)
+    val port = grpcListenPort()
     val server =
         ServerBuilder
-            .forPort(50051)
+            .forPort(port)
             .addService(bridgeService)
             .build()
 
     server.start()
-    println("gRPC server started on port 50051")
+    println("gRPC server started on port $port")
     server.awaitTermination()
 }

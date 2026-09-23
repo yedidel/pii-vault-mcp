@@ -8,5 +8,5 @@
     "types": ["node"],
     "noEmit": true
   },
-  "include": ["server.ts"]
+  "include": ["server.ts", "adapter_http.ts", "adapter_http.test.ts"]
 }

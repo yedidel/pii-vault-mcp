@@ -55,6 +55,7 @@ class SseClientNotifier(ClientNotifier):
         self._lock = threading.Lock()
         # (platform, sessionId) -> queue for that connection only
         self._subscribers: dict[tuple[str, str], asyncio.Queue] = {}
+        self._loop: asyncio.AbstractEventLoop | None = None
 
     def subscribe(
             self,
@@ -66,6 +67,10 @@ class SseClientNotifier(ClientNotifier):
             raise ValueError("platform and sessionId are required")
 
         queue: asyncio.Queue = asyncio.Queue(maxsize=_sse_queue_maxsize())
+        try:
+            self._loop = asyncio.get_running_loop()
+        except RuntimeError:
+            self._loop = None
         with self._lock:
             previous = self._subscribers.get(key)
 
@@ -75,9 +80,16 @@ class SseClientNotifier(ClientNotifier):
                 )
 
             self._subscribers[key] = queue
-        # Close the previous connection for this key, if any.
         if previous is not None:
-            previous.put_nowait(None)
+            try:
+                previous.put_nowait(None)
+            except asyncio.QueueFull:
+                logger.warning(
+                    "SSE previous subscriber queue full while replacing "
+                    "platform=%s sessionId=%s",
+                    platform,
+                    session_id,
+                )
 
         return queue
 
@@ -110,17 +122,7 @@ class SseClientNotifier(ClientNotifier):
             )
             return
 
-        try:
-            queue.put_nowait(event)
-        except asyncio.QueueFull:
-            logger.warning(
-                "SSE queue full for platform=%s sessionId=%s requestId=%s",
-                event.platform,
-                event.sessionId,
-                event.requestId,
-            )
-            return
-
+        self._enqueue(queue, event)
         logger.debug(
             "Delivered client notification platform=%s sessionId=%s "
             "requestId=%s",
@@ -145,20 +147,29 @@ class SseClientNotifier(ClientNotifier):
             )
             return
 
-        try:
-            queue.put_nowait(event)
-        except asyncio.QueueFull:
-            logger.warning(
-                "SSE queue full for vault.paired platform=%s sessionId=%s",
-                event.platform,
-                event.sessionId,
-            )
-            return
-
+        self._enqueue(queue, event)
         logger.info(
             "Delivered vault.paired platform=%s sessionId=%s userInstallId=%s",
             event.platform,
             event.sessionId,
             event.userInstallId,
         )
+
+    def _enqueue(self, queue: asyncio.Queue, item: object) -> None:
+        def put() -> None:
+            try:
+                queue.put_nowait(item)
+            except asyncio.QueueFull:
+                logger.warning("SSE queue full while delivering client event")
+
+        loop = self._loop
+        try:
+            running = asyncio.get_running_loop()
+        except RuntimeError:
+            running = None
+
+        if loop is not None and running is not loop and loop.is_running():
+            loop.call_soon_threadsafe(put)
+            return
+        put()
 

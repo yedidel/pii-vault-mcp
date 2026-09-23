@@ -44,6 +44,11 @@ class BridgeServiceStub:
                 request_serializer=bridge__pb2.StatusRequest.SerializeToString,
                 response_deserializer=bridge__pb2.StatusResponse.FromString,
                 _registered_method=True)
+        self.EvaluatePolicy = channel.unary_unary(
+                '/bridge.BridgeService/EvaluatePolicy',
+                request_serializer=bridge__pb2.PolicyEvaluationRequest.SerializeToString,
+                response_deserializer=bridge__pb2.PolicyEvaluationResponse.FromString,
+                _registered_method=True)
 
 
 class BridgeServiceServicer:
@@ -61,6 +66,15 @@ class BridgeServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def EvaluatePolicy(self, request, context):
+        """Query-only: Vault evaluates current user privacy policy.
+        Does not create an action or workflow. Technical failures use gRPC
+        status codes, not a privacy decision enum.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_BridgeServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -73,6 +87,11 @@ def add_BridgeServiceServicer_to_server(servicer, server):
                     servicer.GetActionStatus,
                     request_deserializer=bridge__pb2.StatusRequest.FromString,
                     response_serializer=bridge__pb2.StatusResponse.SerializeToString,
+            ),
+            'EvaluatePolicy': grpc.unary_unary_rpc_method_handler(
+                    servicer.EvaluatePolicy,
+                    request_deserializer=bridge__pb2.PolicyEvaluationRequest.FromString,
+                    response_serializer=bridge__pb2.PolicyEvaluationResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -129,6 +148,33 @@ class BridgeService:
             '/bridge.BridgeService/GetActionStatus',
             bridge__pb2.StatusRequest.SerializeToString,
             bridge__pb2.StatusResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def EvaluatePolicy(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/bridge.BridgeService/EvaluatePolicy',
+            bridge__pb2.PolicyEvaluationRequest.SerializeToString,
+            bridge__pb2.PolicyEvaluationResponse.FromString,
             options,
             channel_credentials,
             insecure,

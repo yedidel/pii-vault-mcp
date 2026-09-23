@@ -6,6 +6,10 @@ import continuation.ContinuationRequest
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 
+/**
+ * Prototype stub. Bridge does not push status for POLLING connectors.
+ * Adapter-side PollingWorker is the supported POLLING continuation.
+ */
 @Component
 class PollingContinuation : ContinuationConnector {
 
@@ -18,13 +22,10 @@ class PollingContinuation : ContinuationConnector {
     override fun continueWorkflow(
         request: ContinuationRequest,
     ) {
-
         logger.info(
-            "polling continuation requested. requestId={}",
+            "POLLING connector is unsupported on Bridge; " +
+                "Adapter PollingWorker must observe GetActionStatus. requestId={}",
             request.requestId,
         )
-
-        // todo:
-        // polling agents will fetch workflow updates
     }
 }

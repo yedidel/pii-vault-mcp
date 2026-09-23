@@ -1,11 +1,36 @@
+import os
+
 import requests
-from continuation.claude_url_allowlist import is_allowed_claude_wake_url
+from continuation.claude_url_allowlist import (
+    is_adapter_continuation_url,
+    is_allowed_claude_wake_url,
+)
 from continuation.wake_provider import WakeProvider
 from logutil import get_logger
 from workflow.models import ContinuationNotification, WorkflowModel
 
 
 logger = get_logger(__name__)
+
+
+def _redact_token(text: str) -> str:
+    token = os.getenv("ADAPTER_AUTH_TOKEN", "").strip()
+    if not token:
+        return text
+    return text.replace(token, "[redacted]")
+
+
+def _adapter_continuation_headers(wake_url: str) -> dict[str, str]:
+    """Bearer header only for this Adapter's protected continuation URL.
+
+    Local bridge-wake /wake posts stay unauthenticated.
+    """
+    if not is_adapter_continuation_url(wake_url):
+        return {}
+    token = os.getenv("ADAPTER_AUTH_TOKEN", "").strip()
+    if not token:
+        return {}
+    return {"Authorization": f"Bearer {token}"}
 
 
 def wake_claude_with_message(
@@ -28,7 +53,22 @@ def wake_claude_with_message(
         "status": status,
         "message": message,
     }
-    response = requests.post(ingress, json=payload, timeout=5)
+    headers = _adapter_continuation_headers(ingress)
+    try:
+        if headers:
+            response = requests.post(
+                ingress,
+                json=payload,
+                headers=headers,
+                timeout=5,
+            )
+        else:
+            response = requests.post(ingress, json=payload, timeout=5)
+    except requests.RequestException as error:
+        redacted = _redact_token(str(error))
+        if redacted != str(error):
+            raise requests.RequestException(redacted) from None
+        raise
     response.raise_for_status()
     return ingress
 
@@ -74,10 +114,14 @@ class ClaudeProvider(WakeProvider):
                 status=notification.status,
             )
         except requests.RequestException as error:
-            raise RuntimeError(
-                f"Failed to wake Claude agent "
-                f"requestId={notification.requestId}: {error}"
-            ) from error
+            detail = _redact_token(str(error))
+            message = (
+                "Failed to wake Claude agent "
+                f"requestId={notification.requestId}: {detail}"
+            )
+            if detail != str(error):
+                raise RuntimeError(message) from None
+            raise RuntimeError(message) from error
 
         logger.info(
             "Woke Claude agent requestId=%s channel=%s",

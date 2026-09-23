@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1100" viewBox="0 0 1600 1100" role="img" aria-label="Bridge Workflow State Diagram">
+  <defs>
+    <style>
+      .title { font: 700 32px Helvetica, Arial, sans-serif; fill: #0f172a; }
+      .subtitle { font: 400 16px Helvetica, Arial, sans-serif; fill: #64748b; }
+      .node { font: 700 14px Helvetica, Arial, sans-serif; fill: #0f172a; }
+      .node-sub { font: 400 12px Helvetica, Arial, sans-serif; fill: #475569; }
+      .edge { font: 600 11px Helvetica, Arial, sans-serif; fill: #334155; }
+      .section { font: 700 13px Helvetica, Arial, sans-serif; fill: #64748b; letter-spacing: 0.04em; }
+      .footer { font: 400 12px Helvetica, Arial, sans-serif; fill: #94a3b8; }
+    </style>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
+    </marker>
+  </defs>
+  <rect width="1600" height="1100" fill="#ffffff"/>
+  <text x="48" y="48" class="title">Workflow Diagram - Bridge Engine</text>
+  <text x="48" y="74" class="subtitle">WorkflowState (internal) | WorkflowStep | NotifyAgent -&gt; Adapter</text>
+
+  <text x="48" y="120" class="section">WORKFLOW STATE</text>
+  <rect x="48" y="140" width="180" height="70" rx="10" fill="#ecfdf5" stroke="#0f766e" stroke-width="2"/>
+  <text x="138" y="170" text-anchor="middle" class="node">RECEIVED</text>
+  <text x="138" y="190" text-anchor="middle" class="node-sub">action accepted</text>
+  <rect x="280" y="140" width="200" height="70" rx="10" fill="#eff6ff" stroke="#1d4ed8" stroke-width="1.5"/>
+  <text x="380" y="170" text-anchor="middle" class="node">WAITING_FOR</text>
+  <text x="380" y="190" text-anchor="middle" class="node-sub">_GUARDIAN</text>
+  <rect x="530" y="140" width="220" height="70" rx="10" fill="#eff6ff" stroke="#1d4ed8" stroke-width="1.5"/>
+  <text x="640" y="170" text-anchor="middle" class="node">WAITING_FOR</text>
+  <text x="640" y="190" text-anchor="middle" class="node-sub">_VAULT_RESPONSE</text>
+  <rect x="800" y="140" width="180" height="70" rx="10" fill="#fefce8" stroke="#ca8a04" stroke-width="1.5"/>
+  <text x="890" y="170" text-anchor="middle" class="node">IN_PROGRESS</text>
+  <text x="890" y="190" text-anchor="middle" class="node-sub">engine running</text>
+  <rect x="1030" y="140" width="180" height="70" rx="10" fill="#f0fdf4" stroke="#16a34a" stroke-width="2"/>
+  <text x="1120" y="170" text-anchor="middle" class="node">COMPLETED</text>
+  <text x="1120" y="190" text-anchor="middle" class="node-sub">terminal success</text>
+  <rect x="1260" y="140" width="180" height="70" rx="10" fill="#fef2f2" stroke="#dc2626" stroke-width="2"/>
+  <text x="1350" y="170" text-anchor="middle" class="node">FAILED</text>
+  <text x="1350" y="190" text-anchor="middle" class="node-sub">terminal failure</text>
+
+  <line x1="228" y1="175" x2="280" y2="175" stroke="#334155" stroke-width="1.8" marker-end="url(#a)"/>
+  <line x1="480" y1="175" x2="530" y2="175" stroke="#334155" stroke-width="1.8" marker-end="url(#a)"/>
+  <line x1="750" y1="175" x2="800" y2="175" stroke="#334155" stroke-width="1.8" marker-end="url(#a)"/>
+  <line x1="980" y1="175" x2="1030" y2="175" stroke="#334155" stroke-width="1.8" marker-end="url(#a)"/>
+  <path d="M 890 210 L 890 250 L 1350 250 L 1350 210" fill="none" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#a)"/>
+  <text x="1100" y="242" class="edge">any step can fail -&gt; FAILED</text>
+
+  <text x="48" y="310" class="section">WORKFLOW STEPS (execution)</text>
+  <rect x="80" y="360" width="200" height="80" rx="10" fill="#ffffff" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="180" y="395" text-anchor="middle" class="node">ACTION_RECEIVED</text>
+  <text x="180" y="415" text-anchor="middle" class="node-sub">persist Action + Workflow</text>
+  <rect x="360" y="360" width="200" height="80" rx="10" fill="#ffffff" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="460" y="395" text-anchor="middle" class="node">VERIFY_AGENT</text>
+  <text x="460" y="415" text-anchor="middle" class="node-sub">trust / install checks</text>
+  <rect x="640" y="360" width="240" height="80" rx="10" fill="#ffffff" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="760" y="395" text-anchor="middle" class="node">REQUEST_VAULT</text>
+  <text x="760" y="415" text-anchor="middle" class="node-sub">_EVALUATION</text>
+  <rect x="960" y="360" width="240" height="80" rx="10" fill="#ffffff" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="1080" y="395" text-anchor="middle" class="node">WAIT_FOR_VAULT</text>
+  <text x="1080" y="415" text-anchor="middle" class="node-sub">_RESPONSE</text>
+  <rect x="1280" y="360" width="200" height="80" rx="10" fill="#ecfdf5" stroke="#0f766e" stroke-width="2"/>
+  <text x="1380" y="395" text-anchor="middle" class="node">NOTIFY_AGENT</text>
+  <text x="1380" y="415" text-anchor="middle" class="node-sub">webhook continue</text>
+
+  <line x1="280" y1="400" x2="360" y2="400" stroke="#334155" stroke-width="1.8" marker-end="url(#a)"/>
+  <line x1="560" y1="400" x2="640" y2="400" stroke="#334155" stroke-width="1.8" marker-end="url(#a)"/>
+  <line x1="880" y1="400" x2="960" y2="400" stroke="#334155" stroke-width="1.8" marker-end="url(#a)"/>
+  <line x1="1200" y1="400" x2="1280" y2="400" stroke="#334155" stroke-width="1.8" marker-end="url(#a)"/>
+  <rect x="1280" y="500" width="200" height="60" rx="10" fill="#f0fdf4" stroke="#16a34a" stroke-width="2"/>
+  <text x="1380" y="535" text-anchor="middle" class="node">FINISHED</text>
+  <line x1="1380" y1="440" x2="1380" y2="500" stroke="#334155" stroke-width="1.8" marker-end="url(#a)"/>
+
+  <text x="48" y="560" class="section">NOTIFY_AGENT DETAIL</text>
+  <rect x="48" y="580" width="1500" height="200" rx="12" fill="#f8fafc" stroke="#e2e8f0"/>
+  <rect x="80" y="620" width="260" height="120" rx="10" fill="#eff6ff" stroke="#1d4ed8"/>
+  <text x="210" y="660" text-anchor="middle" class="node">NotifyAgentCommand</text>
+  <text x="210" y="684" text-anchor="middle" class="node-sub">connectorType from action</text>
+  <text x="210" y="704" text-anchor="middle" class="node-sub">connectorContext = URL</text>
+  <line x1="340" y1="680" x2="420" y2="680" stroke="#334155" stroke-width="2" marker-end="url(#a)"/>
+  <rect x="420" y="620" width="280" height="120" rx="10" fill="#eff6ff" stroke="#1d4ed8"/>
+  <text x="560" y="660" text-anchor="middle" class="node">WebhookContinuation</text>
+  <text x="560" y="684" text-anchor="middle" class="node-sub">POST callbackUrl</text>
+  <text x="560" y="704" text-anchor="middle" class="node-sub">WebhookNotification JSON</text>
+  <line x1="700" y1="680" x2="780" y2="680" stroke="#334155" stroke-width="2" marker-end="url(#a)"/>
+  <rect x="780" y="620" width="300" height="120" rx="10" fill="#ecfdf5" stroke="#0f766e"/>
+  <text x="930" y="660" text-anchor="middle" class="node">Adapter /webhook/bridge</text>
+  <text x="930" y="684" text-anchor="middle" class="node-sub">WakeDispatcher.wake()</text>
+  <text x="930" y="704" text-anchor="middle" class="node-sub">platform provider</text>
+  <line x1="1080" y1="680" x2="1160" y2="680" stroke="#334155" stroke-width="2" marker-end="url(#a)"/>
+  <rect x="1160" y="620" width="340" height="120" rx="10" fill="#fefce8" stroke="#ca8a04"/>
+  <text x="1330" y="655" text-anchor="middle" class="node">Agent resumes</text>
+  <text x="1330" y="679" text-anchor="middle" class="node-sub">Claude channel | OpenAI response</text>
+  <text x="1330" y="699" text-anchor="middle" class="node-sub">Gemini interaction | SSE notify</text>
+  <text x="1330" y="719" text-anchor="middle" class="node-sub">PollingContinuation = stub</text>
+
+  <text x="48" y="830" class="section">KEY WORKFLOW EVENTS</text>
+  <rect x="48" y="850" width="240" height="50" rx="8" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="168" y="880" text-anchor="middle" class="node-sub">ActionCreatedEvent</text>
+  <rect x="310" y="850" width="240" height="50" rx="8" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="430" y="880" text-anchor="middle" class="node-sub">GuardianApprovedEvent</text>
+  <rect x="572" y="850" width="240" height="50" rx="8" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="692" y="880" text-anchor="middle" class="node-sub">GuardianRejectedEvent</text>
+  <rect x="834" y="850" width="280" height="50" rx="8" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="974" y="880" text-anchor="middle" class="node-sub">ActionResponseReceivedEvent</text>
+  <rect x="1136" y="850" width="240" height="50" rx="8" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="1256" y="880" text-anchor="middle" class="node-sub">WorkflowCompletedEvent</text>
+  <rect x="1396" y="850" width="150" height="50" rx="8" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="1471" y="880" text-anchor="middle" class="node-sub">WorkflowFailed</text>
+
+  <text x="48" y="960" class="section">AGENT-VISIBLE STATUS (StatusType via gRPC)</text>
+  <text x="48" y="990" class="node-sub">RECEIVED | IN_PROGRESS | COMPLETED | REJECTED | FAILED | FAILED_APP_NOT_INSTALLED | UNTRUSTED | ...</text>
+  <text x="48" y="1020" class="node-sub">Note: StatusType != WorkflowState. Agents see StatusType; engine uses WorkflowState + WorkflowStep.</text>
+  <text x="48" y="1070" class="footer">Source: WorkflowState.kt | WorkflowStep.kt | WorkflowCommandExecutor.kt | WebhookContinuation.kt</text>
+</svg>

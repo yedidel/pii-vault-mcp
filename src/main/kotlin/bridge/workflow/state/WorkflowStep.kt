@@ -6,8 +6,8 @@ package bridge.workflow
 enum class WorkflowStep {
     ACTION_RECEIVED,
     VERIFY_AGENT,
+    /** Command issued when entering WAITING_FOR_VAULT_RESPONSE. */
     REQUEST_VAULT_EVALUATION,
-    WAIT_FOR_VAULT_RESPONSE,
     NOTIFY_AGENT,
     FINISHED
 }

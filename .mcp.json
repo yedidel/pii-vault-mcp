@@ -1,14 +1,9 @@
 {
   "mcpServers": {
-    "bridge-adapter": {
-      "type": "http",
-      "url": "http://127.0.0.1:8000/mcp"
-    },
     "bridge-wake": {
-      "command": "npx",
+      "command": "bash",
       "args": [
-        "tsx",
-        "/Users/yhd/pii-vault-mcp/agent-adapter/claude-channel/server.ts"
+        "agent-adapter/claude-channel/launch.sh"
       ],
       "env": {
         "ADAPTER_BASE_URL": "http://127.0.0.1:8000"

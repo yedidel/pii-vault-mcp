@@ -1,5 +1,3 @@
-import main
-import time
 from logutil import get_logger
 from workflow.models import ActionRequestModel, WorkflowModel
 import os
@@ -44,6 +42,7 @@ class WorkflowService:
             platform: str,
             continuation_context: str,
     ) -> WorkflowModel:
+        import main
         response = main.send_action(action_request)
 
         workflow_id = response.get("workflowId") or ""
@@ -74,6 +73,7 @@ class WorkflowService:
             self,
             request_id: str,
     ) -> WorkflowModel | None:
+        self._evict_expired()
         return self.pending_workflows.get(request_id)
 
     def update_status(
@@ -106,6 +106,7 @@ class WorkflowService:
         self.pending_workflows.pop(request_id, None)
 
     def list_pending_polling(self) -> list[WorkflowModel]:
+        self._evict_expired()
         return [
             workflow
             for workflow in self.pending_workflows.values()

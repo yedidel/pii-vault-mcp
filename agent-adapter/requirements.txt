@@ -3,8 +3,11 @@ grpcio-tools # protoc compiler for Python
 protobuf # Protocol Buffers
 fastapi # FastAPI framework for building APIs for the agent adapter
 uvicorn # http server for running the FastAPI application
-mcp # MCP library for communication with the MCP server
+mcp>=1.8.0,<2 # FastMCP lives in mcp 1.x (mcp.server.fastmcp); MCP 2.x removes it
 google-genai # Gemini Interactions API (Google AI Studio / Gemini API)
 openai # OpenAI Responses + Conversations API (OpenAIProvider wake)
 requests # ClaudeProvider HTTP POST to Channel ingress
 cryptography # Encrypted local PII vault store (vault:// references)
+python-dotenv # load_dotenv(agent-adapter/.env) in adapter.py and providers
+httpx # InstallDirectoryClient
+websockets # mock-vault/vault_sim.py (typically run with this venv)

@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>THE BRIDGE — Privacy Preferences</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --bg-accent: #17202a;
+      --card: #1b2430;
+      --border: #2c3a4a;
+      --text: #e8eef4;
+      --muted: #93a4b5;
+      --accent: #3d8bfd;
+      --accent-hover: #5a9dff;
+      --ok: #3dcc8a;
+      --ok-bg: #143326;
+      --err: #f07178;
+      --err-bg: #3a1c22;
+      --warn: #e6c07b;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      background:
+        radial-gradient(1200px 600px at 50% -10%, #1d3a5c 0%, transparent 55%),
+        var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 1.25rem;
+    }
+
+    .shell {
+      width: 100%;
+      max-width: 28rem;
+      margin: 1.5rem 0 2rem;
+    }
+
+    .brand {
+      text-align: center;
+      margin-bottom: 1.25rem;
+    }
+
+    .brand-mark {
+      display: inline-block;
+      letter-spacing: 0.28em;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--accent);
+      text-transform: uppercase;
+    }
+
+    .brand h1 {
+      margin: 0.35rem 0 0;
+      font-size: 1.15rem;
+      font-weight: 650;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.5rem 1.4rem 1.35rem;
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+      margin-bottom: 1rem;
+    }
+
+    h2 {
+      margin: 0 0 0.4rem;
+      font-size: 1.35rem;
+      font-weight: 650;
+    }
+
+    .lede {
+      margin: 0 0 1.15rem;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .field-row {
+      margin: 0 0 1rem;
+      padding: 0.9rem 0.95rem;
+      background: var(--bg-accent);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+
+    .field-row h3 {
+      margin: 0 0 0.55rem;
+      font-size: 0.98rem;
+      font-weight: 650;
+    }
+
+    .choice {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.45rem;
+    }
+
+    .choice button {
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 0.55rem 0.4rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--muted);
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .choice button.selected {
+      color: #071422;
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .field-row input[type="text"],
+    .field-row input[type="password"],
+    .field-row input[type="email"] {
+      width: 100%;
+      margin-top: 0.7rem;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 0.55rem 0.7rem;
+      font-size: 0.92rem;
+      color: var(--text);
+      background: var(--card);
+    }
+
+    .stored-label {
+      display: block;
+      margin-top: 0.7rem;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+
+    .hint {
+      margin: 0 0 1rem;
+      padding: 0.85rem 0.95rem;
+      border: 1px dashed #3d5368;
+      border-radius: 12px;
+      background: rgba(61, 139, 253, 0.06);
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    .hint p { margin: 0 0 0.55rem; }
+    .hint p:last-child { margin: 0; }
+    .hint strong { color: var(--text); font-weight: 650; }
+
+    .status {
+      min-height: 1.4rem;
+      margin: 0 0 1rem;
+      font-size: 0.92rem;
+    }
+
+    .status.error { color: var(--err); }
+    .status.ok { color: var(--ok); }
+    .status.info { color: var(--muted); }
+
+    button.primary {
+      width: 100%;
+      border: 0;
+      border-radius: 10px;
+      padding: 0.85rem 1rem;
+      font-size: 1rem;
+      font-weight: 650;
+      color: #071422;
+      background: var(--accent);
+      cursor: pointer;
+    }
+
+    button.primary:hover:not(:disabled) {
+      background: var(--accent-hover);
+    }
+
+    button.primary:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    details.tech {
+      margin-top: 0.35rem;
+      padding-top: 0.85rem;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    details.tech summary {
+      cursor: pointer;
+      color: var(--text);
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="brand">
+      <div class="brand-mark">THE BRIDGE</div>
+      <h1>Your Vault</h1>
+    </header>
+
+    <section class="card">
+      <h2>Privacy Preferences</h2>
+      <p class="lede">
+        Choose who is allowed to handle each piece of information.
+      </p>
+      <p class="status info" id="status">Loading your preferences…</p>
+
+      <div id="fields"></div>
+
+      <div class="hint">
+        <p>
+          <strong>Agent can handle:</strong>
+          The AI agent may use this value while completing the task.
+        </p>
+        <p>
+          <strong>Vault only:</strong>
+          The value stays in your Vault. The AI agent does not need it.
+          It is released only to complete an action you approve.
+        </p>
+      </div>
+
+      <button class="primary" id="save" type="button" disabled>Save preferences</button>
+      <details class="tech">
+        <summary>Connected installation</summary>
+        <p id="install-label">—</p>
+      </details>
+    </section>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const FIELD_LABELS = { name: "Name", email: "Email", password: "Password" };
+    const UI_TO_POLICY = {
+      agent: "AGENT_ALLOWED",
+      vault: "VAULT_ONLY",
+    };
+    const POLICY_TO_UI = {
+      AGENT_ALLOWED: "agent",
+      VAULT_ONLY: "vault",
+    };
+
+    const statusEl = document.getElementById("status");
+    const fieldsEl = document.getElementById("fields");
+    const saveBtn = document.getElementById("save");
+    const installLabel = document.getElementById("install-label");
+    let userInstallId = (params.get("userInstallId") || "").trim();
+    const selections = { name: "agent", email: "vault", password: "vault" };
+    const storedMeta = {
+      name: { hasValue: false, preview: null },
+      email: { hasValue: false, preview: null },
+      password: { hasValue: false, preview: null },
+    };
+    const drafts = { name: "", email: "", password: "" };
+
+    function setStatus(text, kind) {
+      statusEl.className = "status " + (kind || "info");
+      statusEl.textContent = text;
+    }
+
+    function renderFields() {
+      fieldsEl.innerHTML = "";
+      Object.keys(FIELD_LABELS).forEach((name) => {
+        const row = document.createElement("div");
+        row.className = "field-row";
+        const title = document.createElement("h3");
+        title.textContent = FIELD_LABELS[name];
+        const choice = document.createElement("div");
+        choice.className = "choice";
+        choice.appendChild(choiceButton(name, "agent", "Agent can handle"));
+        choice.appendChild(choiceButton(name, "vault", "Vault only"));
+        row.appendChild(title);
+        row.appendChild(choice);
+        if (selections[name] === "vault") {
+          const label = document.createElement("span");
+          label.className = "stored-label";
+          label.textContent = "Stored value";
+          row.appendChild(label);
+          row.appendChild(valueInput(name));
+        }
+        fieldsEl.appendChild(row);
+      });
+    }
+
+    function valueInput(name) {
+      const input = document.createElement("input");
+      input.dataset.field = name;
+      if (name === "password") {
+        input.type = "password";
+        input.autocomplete = "new-password";
+        input.placeholder = storedMeta.password.hasValue
+          ? "Stored in your Vault"
+          : "Enter a password for your Vault";
+      } else if (name === "email") {
+        input.type = "email";
+        input.value = drafts.email || storedMeta.email.preview || "";
+        input.placeholder = "Stored email";
+      } else {
+        input.type = "text";
+        input.value = drafts.name || storedMeta.name.preview || "";
+        input.placeholder = "Stored name";
+      }
+      input.addEventListener("input", () => {
+        drafts[name] = input.value;
+        saveBtn.disabled = false;
+      });
+      return input;
+    }
+
+    function choiceButton(field, value, label) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.dataset.field = field;
+      button.dataset.value = value;
+      button.textContent = label;
+      if (selections[field] === value) button.classList.add("selected");
+      button.addEventListener("click", () => {
+        selections[field] = value;
+        renderFields();
+        setStatus("Unsaved changes. These apply to your next action.", "info");
+        saveBtn.disabled = false;
+      });
+      return button;
+    }
+
+    async function loadPreferences() {
+      const query = userInstallId
+        ? ("?userInstallId=" + encodeURIComponent(userInstallId))
+        : "";
+      const res = await fetch("/api/privacy" + query);
+      const body = await res.json();
+      if (!res.ok) {
+        throw new Error(body.error || "Unable to load preferences.");
+      }
+      userInstallId = body.userInstallId || userInstallId;
+      installLabel.textContent = "This Vault is connected for your current pairing.";
+      const fields = body.fields || {};
+      const stored = body.storedValues || {};
+      Object.keys(FIELD_LABELS).forEach((name) => {
+        selections[name] = POLICY_TO_UI[fields[name]] || "vault";
+        storedMeta[name] = stored[name] || { hasValue: false, preview: null };
+        if (name === "password") drafts.password = "";
+        else drafts[name] = storedMeta[name].preview || "";
+      });
+      renderFields();
+      saveBtn.disabled = false;
+      setStatus("Your current preferences are shown below.", "info");
+    }
+
+    saveBtn.addEventListener("click", async () => {
+      saveBtn.disabled = true;
+      setStatus("Saving…", "info");
+      const fields = {};
+      const values = {};
+      Object.keys(FIELD_LABELS).forEach((name) => {
+        fields[name] = UI_TO_POLICY[selections[name]];
+        if (selections[name] === "vault") {
+          const typed = drafts[name];
+          if (name === "password") {
+            if (typed) values.password = typed;
+          } else if (typed) {
+            values[name] = typed;
+          }
+        }
+      });
+      try {
+        const res = await fetch("/api/privacy", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userInstallId, fields, values }),
+        });
+        const body = await res.json();
+        if (!res.ok) {
+          setStatus(body.error || "Could not save preferences.", "error");
+          saveBtn.disabled = false;
+          return;
+        }
+        const stored = body.storedValues || {};
+        Object.keys(FIELD_LABELS).forEach((name) => {
+          storedMeta[name] = stored[name] || storedMeta[name];
+          if (name === "password") drafts.password = "";
+          else drafts[name] = storedMeta[name].preview || drafts[name];
+        });
+        renderFields();
+        setStatus(
+          "Privacy preferences saved. Changes apply to your next action.",
+          "ok"
+        );
+        saveBtn.disabled = false;
+      } catch (err) {
+        setStatus("Network error while saving. Your last saved preferences are unchanged.", "error");
+        saveBtn.disabled = false;
+      }
+    });
+
+    renderFields();
+    loadPreferences().catch((err) => {
+      setStatus(err.message || "Could not load preferences.", "error");
+      saveBtn.disabled = true;
+    });
+  </script>
+</body>
+</html>

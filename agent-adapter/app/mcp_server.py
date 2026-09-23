@@ -27,7 +27,13 @@ from workflow.workflow_context import (
 )
 from session_registry import SessionConflictError
 from pairing_service import PairingRequired
+from transport.vault_resolve_http import handle_vault_resolve_request
 from vault_store import load_vault_store
+from action_policy_gate import (
+    ActionPolicyError,
+    SUPPORTED_SEND_ACTION_TYPES,
+    enforce_send_action_policy,
+)
 
 logger = get_logger(__name__)
 
@@ -94,38 +100,9 @@ def _is_local_ingress(url: str) -> bool:
     return True
 
 
-def _is_localhost(request: Request) -> bool:
-    client = request.client
-    if client is None:
-        return False
-    return client.host in {"127.0.0.1", "::1", "localhost"}
-
-
 @mcp.custom_route("/vault/resolve", methods=["POST"])
 async def vault_resolve_route(request: Request) -> Response:
-    if not _is_localhost(request):
-        return JSONResponse({"error": "Forbidden"}, status_code=403)
-
-    try:
-        payload = await request.json()
-    except Exception:
-        return JSONResponse({"error": "Invalid JSON body"}, status_code=400)
-
-    refs = payload.get("refs")
-    if not isinstance(refs, list) or not refs:
-        return JSONResponse({"error": "refs must be a non-empty array"}, status_code=400)
-
-    resolved: dict[str, str] = {}
-    try:
-        for ref in refs:
-            ref_text = str(ref).strip()
-            if not ref_text:
-                continue
-            resolved[ref_text] = pii_vault_store.resolve(ref_text)
-    except (KeyError, ValueError) as error:
-        return JSONResponse({"error": str(error)}, status_code=404)
-
-    return JSONResponse({"resolved": resolved})
+    return await handle_vault_resolve_request(request, pii_vault_store)
 
 
 @mcp.custom_route("/webhook/bridge", methods=["POST"])
@@ -288,15 +265,10 @@ async def health_route(_request: Request) -> Response:
     }
     
     FILL_FORM:
-    {
-      "formUrl": "http://127.0.0.1:9000/register",
-      "name": "...",
-      "email": "...",
-      "password": "..."
-    }
-    Sensitive values (email, password) are stored encrypted and sent to Bridge
-    as vault://pii/... references automatically.
-    formUrl is optional — defaults to the demo registration page.
+    Supply plaintext only for fields the user can let the agent handle
+    (often name). Do not ask for Vault-only values such as email or
+    password. Policy is enforced automatically; do not call
+    evaluate_user_policy first. formUrl is optional.
     
     TRANSACTION:
     {
@@ -418,21 +390,18 @@ def send_action(
         if action_type == "FILL_FORM":
             if not str(params.get("formUrl") or "").strip():
                 params["formUrl"] = DEFAULT_DEMO_FORM_URL
-            missing = [
-                key for key in ("name", "email", "password")
-                if not str(params.get(key) or "").strip()
-            ]
-            if missing:
-                return {
-                    "error": (
-                        "FILL_FORM requires non-empty parameters.name, "
-                        "parameters.email, and parameters.password. "
-                        f"Missing: {', '.join(missing)}. "
-                        "Optional parameters.formUrl defaults to "
-                        f"{DEFAULT_DEMO_FORM_URL}."
-                    ),
-                }
-            params = pii_vault_store.sanitize_fill_form_parameters(params)
+
+        if action_type in SUPPORTED_SEND_ACTION_TYPES:
+            try:
+                params = enforce_send_action_policy(
+                    evaluate_fn=main.evaluate_policy,
+                    agent_id=agentId,
+                    user_install_id=user_install_id,
+                    action_type=action_type,
+                    params=params,
+                )
+            except ActionPolicyError as error:
+                return {"error": str(error)}
 
         continuation_target = continuation_provider.resolve()
 
@@ -484,6 +453,44 @@ def store_pii(fieldType: str, value: str):
         return {"token": token}
     except ValueError as error:
         return {"error": str(error)}
+
+
+@mcp.tool(
+    description=(
+        "Inspect the user's current Vault privacy policy. Optional; "
+        "send_action already evaluates policy automatically. "
+        "Pass actionType and field NAMES only. "
+        "The Vault is the source of truth. Decisions: AGENT_ALLOWED, "
+        "VAULT_ONLY, USER_APPROVAL, PARTIAL. Technical failures return "
+        "error, never a privacy decision."
+    )
+)
+def evaluate_user_policy(
+        actionType: str,
+        fieldNames: Annotated[
+            list[str],
+            Field(description="Field names only. Do not send values."),
+        ] = None,
+        agentId: str = "agent-123",
+):
+    names = list(fieldNames or [])
+    user_install_id = _resolve_user_install_id(
+        action_summary=f"POLICY {actionType}",
+    )
+    if isinstance(user_install_id, dict):
+        return user_install_id
+
+    try:
+        return main.evaluate_policy(
+            agent_id=agentId,
+            user_install_id=user_install_id,
+            action_type=actionType,
+            field_names=names,
+        )
+    except Exception as error:
+        return {
+            "error": str(error),
+        }
 
 
 @mcp.tool(

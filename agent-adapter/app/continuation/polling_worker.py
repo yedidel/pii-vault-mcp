@@ -142,7 +142,12 @@ class PollingWorker:
                 current_status,
             )
 
-            handled = self._polling_continuation.handle(notification)
+            # Continuation (including Gemini wake) must not block the
+            # Adapter event loop or SSE cannot be delivered.
+            handled = await asyncio.to_thread(
+                self._polling_continuation.handle,
+                notification,
+            )
             if not handled:
                 logger.warning(
                     "Polling handle skipped requestId=%s "

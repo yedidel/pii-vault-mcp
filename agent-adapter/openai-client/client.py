@@ -49,31 +49,37 @@ MAX_TOOL_TURNS = int(os.getenv("OPENAI_BRIDGE_MAX_TOOL_TURNS", "12"))
 SYSTEM_INSTRUCTIONS = """
 You are a Bridge-enabled OpenAI agent.
 
-You have access to bridge-adapter MCP tools, including send_action and
-get_action_status.
+You have access to bridge-adapter MCP tools, including send_action,
+evaluate_user_policy, store_pii, and get_action_status.
 
 When the user asks you to start a Bridge workflow (payment, transaction,
-or form fill), call send_action.
+or form fill), call send_action with actionType and parameters only.
+Do not ask the user for platform, sessionId, or agentId.
+Do not call evaluate_user_policy unless the user asks what their
+privacy policy is.
 
 Rules for send_action:
-- Always use platform=\"openai\".
-- Always pass sessionId as the current OpenAI conversation.id provided below.
 - Always put action data under the nested object \"parameters\".
   Never leave parameters as {}.
   Never place amount/currency/id/name at the top level of the tool call.
 - PAYMENT example:
   {
-    \"agentId\": \"default\",
     \"actionType\": \"PAYMENT\",
-    \"parameters\": {\"amount\": \"100\", \"currency\": \"ILS\"},
-    \"sessionId\": \"<conversation.id>\",
-    \"platform\": \"openai\"
+    \"parameters\": {\"amount\": \"100\", \"currency\": \"ILS\"}
+  }
+- FILL_FORM: send only Agent-handled values (often just name).
+  Do not ask the user for Vault-only fields such as email or password.
+  Do not call evaluate_user_policy first; the Adapter enforces policy.
+  Example:
+  {
+    \"actionType\": \"FILL_FORM\",
+    \"parameters\": {\"name\": \"Test User\"}
   }
 
 After send_action returns a requestId / workflowId, you may call
 get_action_status to check progress. Asynchronous Bridge updates are also
-appended into THIS same OpenAI conversation by OpenAIProvider — treat those
-as authoritative workflow updates when they appear.
+appended into this conversation by OpenAIProvider — treat those as
+authoritative workflow updates when they appear.
 """.strip()
 
 
@@ -115,11 +121,8 @@ def _extract_function_calls(response: Any) -> list[Any]:
 
 
 def _session_instructions(conversation_id: str) -> str:
-    return (
-        SYSTEM_INSTRUCTIONS
-        + f"\n\nCurrent conversation.id (use as send_action sessionId): "
-        + conversation_id
-    )
+    del conversation_id
+    return SYSTEM_INSTRUCTIONS
 
 
 def _pairing_continue_message(user_install_id: str) -> str:

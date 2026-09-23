@@ -1,7 +1,7 @@
 package bridge.workflow.handler
+
 import bridge.Bridge.StatusType
 import bridge.workflow.NotifyAgentCommand
-import bridge.workflow.PublishEventCommand
 import bridge.workflow.TransitionCommand
 import bridge.workflow.UpdateActionStatusCommand
 import bridge.workflow.WorkflowContext
@@ -10,13 +10,13 @@ import bridge.workflow.WorkflowEventType
 import bridge.workflow.WorkflowState
 import bridge.workflow.WorkflowStep
 import bridge.workflow.events.GuardianRejectedEvent
-import bridge.workflow.events.WorkflowFailedEvent
 import org.springframework.stereotype.Component
 
 /**
  * Handles GuardianRejectedEvent.
  *
  * The workflow is terminated because the Guardian rejected the agent.
+ * NotifyAgent runs here exactly once; no follow-up WORKFLOW_FAILED event.
  */
 @Component
 class GuardianRejectedEventHandler :
@@ -42,15 +42,6 @@ class GuardianRejectedEventHandler :
                     requestId = event.requestId,
                     status = StatusType.REJECTED,
                     resultData = event.reason,
-                ),
-
-                PublishEventCommand(
-                    WorkflowFailedEvent(
-                        workflowId = event.workflowId,
-                        requestId = event.requestId,
-                        context = event.context,
-                        failureReason = event.reason
-                    )
                 ),
 
                 NotifyAgentCommand(

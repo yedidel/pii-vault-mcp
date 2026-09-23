@@ -92,6 +92,7 @@ async def run_adapter():
                 "MCP on http://%s:%s/mcp, "
                 "webhook on http://%s:%s/webhook/bridge, "
                 "events on http://%s:%s/events, "
+                "CONNECTOR_TYPE=%s, "
                 "polling worker enabled, pairing watcher enabled",
                 ADAPTER_HOST,
                 ADAPTER_PORT,
@@ -99,6 +100,7 @@ async def run_adapter():
                 ADAPTER_PORT,
                 ADAPTER_HOST,
                 ADAPTER_PORT,
+                os.getenv("CONNECTOR_TYPE", "WEBHOOK"),
             )
             await asyncio.gather(
                 run_mcp_http_server(),

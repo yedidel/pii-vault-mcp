@@ -9,7 +9,6 @@ from pathlib import Path
 from cryptography.fernet import Fernet, InvalidToken
 
 VAULT_REF_PREFIX = "vault://pii/"
-SENSITIVE_FILL_FORM_FIELDS = frozenset({"email", "password"})
 ALLOWED_FIELD_TYPES = frozenset({"email", "password", "ssn", "phone"})
 
 
@@ -29,6 +28,13 @@ class PiiVaultStore:
         field_type = field_type.strip().lower()
         if field_type not in ALLOWED_FIELD_TYPES:
             raise ValueError(f"Unsupported fieldType: {field_type}")
+        return self._store_encrypted(field_type, value)
+
+    def store_policy_field(self, field_type: str, value: str) -> str:
+        field_type = _internal_field_type(field_type)
+        return self._store_encrypted(field_type, value)
+
+    def _store_encrypted(self, field_type: str, value: str) -> str:
         value = value.strip()
         if not value:
             raise ValueError("value must be non-empty")
@@ -76,13 +82,17 @@ class PiiVaultStore:
     def resolve_many(self, refs: list[str]) -> dict[str, str]:
         return {ref: self.resolve(ref) for ref in refs}
 
-    def sanitize_fill_form_parameters(self, params: dict[str, str]) -> dict[str, str]:
+    def sanitize_fill_form_parameters(
+            self,
+            params: dict[str, str],
+            vault_required: list[str],
+    ) -> dict[str, str]:
         sanitized = dict(params)
-        for key in SENSITIVE_FILL_FORM_FIELDS:
+        for key in vault_required:
             raw = str(sanitized.get(key) or "").strip()
             if not raw or self.is_ref(raw):
                 continue
-            sanitized[key] = self.store(key, raw)
+            sanitized[key] = self.store_policy_field(key, raw)
         return sanitized
 
     def _load(self) -> None:
@@ -114,6 +124,17 @@ def load_vault_store(base_dir: Path) -> PiiVaultStore:
     store_path = data_dir / "pii_vault.json"
     key = _load_or_create_key(data_dir)
     return PiiVaultStore(store_path=store_path, key=key)
+
+
+def _internal_field_type(field_type: str) -> str:
+    name = (field_type or "").strip().lower()
+    if not name or len(name) > 64:
+        raise ValueError(f"Unsupported fieldType: {field_type}")
+    if any(ch.isspace() for ch in name):
+        raise ValueError(f"Unsupported fieldType: {field_type}")
+    if not all(ch.isalnum() or ch in {"_", "-"} for ch in name):
+        raise ValueError(f"Unsupported fieldType: {field_type}")
+    return name
 
 
 def _load_or_create_key(data_dir: Path) -> bytes:

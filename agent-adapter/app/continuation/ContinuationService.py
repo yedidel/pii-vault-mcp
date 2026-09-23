@@ -39,10 +39,17 @@ class ContinuationService:
             notification.status,
         )
 
-        self.wake_dispatcher.wake(
-            workflow,
-            notification,
-        )
+        try:
+            self.wake_dispatcher.wake(
+                workflow,
+                notification,
+            )
+        except Exception:
+            logger.exception(
+                "Provider continuation failed requestId=%s platform=%s",
+                notification.requestId,
+                workflow.platform,
+            )
 
         if self._is_final_status(notification.status):
             self.workflow_service.remove_workflow(

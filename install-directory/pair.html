@@ -1,53 +1,398 @@
 <!DOCTYPE html>
-<html lang="he" dir="rtl">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>חיבור Mock Vault</title>
+  <title>THE BRIDGE — Connect Your Vault</title>
   <style>
-    body {
-      font-family: system-ui, sans-serif;
-      max-width: 32rem;
-      margin: 2rem auto;
-      padding: 0 1rem;
-      line-height: 1.5;
+    :root {
+      --bg: #0f1419;
+      --bg-accent: #17202a;
+      --card: #1b2430;
+      --border: #2c3a4a;
+      --text: #e8eef4;
+      --muted: #93a4b5;
+      --accent: #3d8bfd;
+      --accent-hover: #5a9dff;
+      --ok: #3dcc8a;
+      --ok-bg: #143326;
+      --err: #f07178;
+      --err-bg: #3a1c22;
+      --warn: #e6c07b;
     }
-    .card {
-      border: 1px solid #ccc;
-      border-radius: 8px;
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      background:
+        radial-gradient(1200px 600px at 50% -10%, #1d3a5c 0%, transparent 55%),
+        var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       padding: 1.25rem;
     }
-    button {
+
+    .shell {
+      width: 100%;
+      max-width: 28rem;
+    }
+
+    .brand {
+      text-align: center;
+      margin-bottom: 1.25rem;
+    }
+
+    .brand-mark {
+      display: inline-block;
+      letter-spacing: 0.28em;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--accent);
+      text-transform: uppercase;
+    }
+
+    .brand h1 {
+      margin: 0.35rem 0 0;
+      font-size: 1.15rem;
+      font-weight: 650;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.5rem 1.4rem 1.35rem;
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+    }
+
+    h2 {
+      margin: 0 0 0.4rem;
+      font-size: 1.35rem;
+      font-weight: 650;
+    }
+
+    .lede {
+      margin: 0 0 1.15rem;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .code-box {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      margin: 0 0 1.1rem;
+      padding: 0.75rem 0.9rem;
+      background: var(--bg-accent);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+
+    .code-box .label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+
+    .code-box code {
+      font-size: 1.05rem;
+      letter-spacing: 0.04em;
+      word-break: break-all;
+    }
+
+    .status {
+      min-height: 1.4rem;
+      margin: 0 0 1rem;
+      font-size: 0.92rem;
+    }
+
+    .status.error { color: var(--err); }
+    .status.ok { color: var(--ok); }
+    .status.info { color: var(--muted); }
+
+    button.primary {
+      width: 100%;
+      border: 0;
+      border-radius: 10px;
+      padding: 0.85rem 1rem;
       font-size: 1rem;
-      padding: 0.6rem 1.2rem;
+      font-weight: 650;
+      color: #071422;
+      background: var(--accent);
       cursor: pointer;
     }
-    .ok { color: #0a7; }
-    .err { color: #c00; }
-    code { background: #f4f4f4; padding: 0.1rem 0.3rem; }
+
+    button.primary:hover:not(:disabled) {
+      background: var(--accent-hover);
+    }
+
+    button.primary:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .coming-soon {
+      margin-top: 1.25rem;
+      padding: 0.95rem 1rem;
+      border: 1px dashed #3d5368;
+      border-radius: 12px;
+      background: rgba(61, 139, 253, 0.06);
+    }
+
+    .coming-soon h3 {
+      margin: 0 0 0.35rem;
+      font-size: 0.92rem;
+    }
+
+    .coming-soon p {
+      margin: 0 0 0.85rem;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    .qr-mock {
+      width: 132px;
+      height: 132px;
+      margin: 0 auto 0.55rem;
+      padding: 8px;
+      background: #f4f7fb;
+      border-radius: 8px;
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      grid-template-rows: repeat(7, 1fr);
+      gap: 3px;
+    }
+
+    .qr-mock span {
+      background: #1b2430;
+      border-radius: 1px;
+    }
+
+    .qr-mock span.off {
+      background: transparent;
+    }
+
+    .qr-caption {
+      text-align: center;
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin: 0;
+    }
+
+    .success-icon {
+      width: 52px;
+      height: 52px;
+      margin: 0 auto 0.85rem;
+      border-radius: 50%;
+      background: var(--ok-bg);
+      color: var(--ok);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.6rem;
+    }
+
+    .success .lede { text-align: center; }
+    .success h2 { text-align: center; }
+
+    a.primary-link {
+      display: block;
+      margin-top: 1rem;
+      text-align: center;
+      text-decoration: none;
+    }
+
+    details.tech {
+      margin-top: 1.1rem;
+      padding-top: 0.85rem;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    details.tech summary {
+      cursor: pointer;
+      color: var(--text);
+    }
+
+    details.tech code {
+      display: block;
+      margin-top: 0.4rem;
+      word-break: break-all;
+    }
+
+    .hidden { display: none !important; }
+
+    .banner {
+      margin: 0 0 1rem;
+      padding: 0.75rem 0.85rem;
+      border-radius: 10px;
+      font-size: 0.9rem;
+    }
+
+    .banner.error {
+      background: var(--err-bg);
+      color: var(--err);
+    }
+
+    .banner.warn {
+      background: #3a3120;
+      color: var(--warn);
+    }
   </style>
 </head>
 <body>
-  <h1>חיבור Mock Vault</h1>
-  <div class="card">
-    <p>קוד pairing: <code id="code">—</code></p>
-    <p id="status">לחצי «חבר» כדי ליצור <code>user_install_id</code> ולרשום את הכספת.</p>
-    <button id="connect" type="button">חבר Mock Vault</button>
-    <pre id="result" hidden></pre>
+  <div class="shell">
+    <header class="brand">
+      <div class="brand-mark">THE BRIDGE</div>
+      <h1>Secure agent-to-vault pairing</h1>
+    </header>
+
+    <section class="card" id="panel-ready">
+      <h2>Connect Your Vault</h2>
+      <p class="lede">
+        An AI agent is requesting permission to connect to your Vault through
+        THE BRIDGE. Confirm this pairing only if you started the request.
+      </p>
+      <div class="code-box">
+        <span class="label">Pairing code</span>
+        <code id="code">—</code>
+      </div>
+      <p class="status info" id="status">Ready to connect your Vault.</p>
+      <button class="primary" id="connect" type="button">Connect Vault</button>
+
+      <aside class="coming-soon" aria-label="Future mobile pairing">
+        <h3>Mobile App Coming Soon</h3>
+        <p>
+          In the production version, scan a QR code with the Vault mobile app
+          to securely connect your Vault.
+        </p>
+        <div class="qr-mock" aria-hidden="true">
+          <span></span><span class="off"></span><span></span><span></span><span class="off"></span><span></span><span></span>
+          <span></span><span></span><span class="off"></span><span></span><span></span><span class="off"></span><span></span>
+          <span class="off"></span><span></span><span></span><span class="off"></span><span></span><span></span><span></span>
+          <span></span><span class="off"></span><span></span><span></span><span></span><span class="off"></span><span></span>
+          <span></span><span></span><span></span><span class="off"></span><span></span><span></span><span class="off"></span>
+          <span class="off"></span><span></span><span></span><span></span><span class="off"></span><span></span><span></span>
+          <span></span><span></span><span class="off"></span><span></span><span></span><span></span><span class="off"></span>
+        </div>
+        <p class="qr-caption">QR pairing will be available in the mobile app.</p>
+      </aside>
+    </section>
+
+    <section class="card success hidden" id="panel-success">
+      <div class="success-icon" aria-hidden="true">✓</div>
+      <h2>Vault Connected</h2>
+      <p class="lede">Your Vault is now securely connected to THE BRIDGE.</p>
+      <a class="primary-link" id="privacy-link" href="#">
+        <button class="primary" type="button">Manage privacy preferences</button>
+      </a>
+      <details class="tech">
+        <summary>Technical details</summary>
+        <span>userInstallId</span>
+        <code id="install-id"></code>
+      </details>
+    </section>
   </div>
+
   <script>
     const params = new URLSearchParams(window.location.search);
     const pairingCode = (params.get("code") || "").trim();
-    document.getElementById("code").textContent = pairingCode || "(חסר code ב-URL)";
+    const codeEl = document.getElementById("code");
+    const statusEl = document.getElementById("status");
+    const connectBtn = document.getElementById("connect");
+    const readyPanel = document.getElementById("panel-ready");
+    const successPanel = document.getElementById("panel-success");
+    const privacyLink = document.getElementById("privacy-link");
+    const installIdEl = document.getElementById("install-id");
+    const VAULT_PRIVACY_BASE = "http://127.0.0.1:8020";
 
-    document.getElementById("connect").addEventListener("click", async () => {
-      const statusEl = document.getElementById("status");
-      const resultEl = document.getElementById("result");
+    function setStatus(text, kind) {
+      statusEl.className = "status " + (kind || "info");
+      statusEl.textContent = text;
+    }
+
+    function showBanner(kind, text) {
+      const existing = readyPanel.querySelector(".banner");
+      if (existing) existing.remove();
+      const banner = document.createElement("div");
+      banner.className = "banner " + kind;
+      banner.textContent = text;
+      readyPanel.insertBefore(banner, readyPanel.querySelector("h2").nextSibling);
+    }
+
+    function showSuccess(userInstallId) {
+      readyPanel.classList.add("hidden");
+      successPanel.classList.remove("hidden");
+      installIdEl.textContent = userInstallId || "—";
+      if (userInstallId) {
+        privacyLink.href =
+          VAULT_PRIVACY_BASE +
+          "/privacy?userInstallId=" +
+          encodeURIComponent(userInstallId);
+      }
+    }
+
+    function disableConnect(disabled) {
+      connectBtn.disabled = disabled;
+    }
+
+    codeEl.textContent = pairingCode || "Missing from URL";
+
+    async function inspectPairing() {
       if (!pairingCode) {
-        statusEl.innerHTML = '<span class="err">חסר pairing code ב-URL.</span>';
+        showBanner("error", "This page is missing a pairing code. Open the link provided by THE BRIDGE.");
+        setStatus("No pairing code in the URL (?code=).", "error");
+        disableConnect(true);
         return;
       }
-      statusEl.textContent = "מחבר...";
+
+      setStatus("Checking pairing status…", "info");
+      disableConnect(true);
+      try {
+        const res = await fetch("/api/pair/" + encodeURIComponent(pairingCode));
+        if (res.status === 404) {
+          showBanner("error", "This pairing code was not found. Request a new pairing from the agent.");
+          setStatus("Pairing code not found.", "error");
+          return;
+        }
+        const body = await res.json();
+        if (!res.ok) {
+          showBanner("error", body.detail || "Unable to load this pairing.");
+          setStatus("Could not load pairing status.", "error");
+          return;
+        }
+        if (body.expired) {
+          showBanner("warn", "This pairing code has expired. Start the action again to get a new link.");
+          setStatus("Pairing code expired.", "error");
+          return;
+        }
+        if (body.status === "COMPLETED" && body.userInstallId) {
+          showSuccess(body.userInstallId);
+          return;
+        }
+        setStatus("Ready to connect your Vault.", "info");
+        disableConnect(false);
+      } catch (err) {
+        setStatus("Could not reach the pairing service. You can still try Connect Vault.", "error");
+        disableConnect(false);
+      }
+    }
+
+    connectBtn.addEventListener("click", async () => {
+      if (!pairingCode) {
+        setStatus("No pairing code in the URL (?code=).", "error");
+        return;
+      }
+      disableConnect(true);
+      setStatus("Connecting…", "info");
       try {
         const res = await fetch("/api/pair/complete", {
           method: "POST",
@@ -55,19 +400,28 @@
           body: JSON.stringify({ pairingCode }),
         });
         const body = await res.json();
-        resultEl.hidden = false;
-        resultEl.textContent = JSON.stringify(body, null, 2);
         if (!res.ok) {
-          statusEl.innerHTML = '<span class="err">' + (body.detail || "שגיאה") + '</span>';
+          const detail = body.detail || "Connection failed.";
+          if (res.status === 410 || /expired/i.test(String(detail))) {
+            showBanner("warn", "This pairing code has expired. Start the action again to get a new link.");
+            setStatus("Pairing code expired.", "error");
+          } else if (res.status === 404) {
+            showBanner("error", "This pairing code was not found.");
+            setStatus("Pairing code not found.", "error");
+          } else {
+            setStatus(detail, "error");
+            disableConnect(false);
+          }
           return;
         }
-        statusEl.innerHTML =
-          '<span class="ok">מחובר!</span> user_install_id: <code>' +
-          body.userInstallId + "</code>";
+        showSuccess(body.userInstallId);
       } catch (err) {
-        statusEl.innerHTML = '<span class="err">' + err + '</span>';
+        setStatus("Network error while connecting. Try again.", "error");
+        disableConnect(false);
       }
     });
+
+    inspectPairing();
   </script>
 </body>
 </html>

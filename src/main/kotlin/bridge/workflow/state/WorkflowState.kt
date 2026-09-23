@@ -11,7 +11,6 @@ enum class WorkflowState {
     RECEIVED,
     WAITING_FOR_GUARDIAN,
     WAITING_FOR_VAULT_RESPONSE,
-    IN_PROGRESS,
     COMPLETED,
     FAILED
 }

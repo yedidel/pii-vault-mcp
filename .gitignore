@@ -69,6 +69,11 @@ build/
 .DS_Store
 .idea/
 *.iml
+# Local IDE MCP settings (do not delete working copies)
+.claude/
+.gemini/
+# Gemini POC runner recreates these logs
+agent-adapter/gemini-bridge-hooks/.poc-*.log
 # gRPC generated files (Python)
 agent-adapter/app/bridge_pb2.py
 agent-adapter/app/bridge_pb2_grpc.py

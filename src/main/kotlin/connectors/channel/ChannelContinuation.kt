@@ -6,6 +6,10 @@ import connectors.api.ContinuationConnector
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 
+/**
+ * Generic HTTP continuation: POST JSON to [ContinuationRequest.connectorContext].
+ * This is not the Claude Channel / Adapter MCP wake path.
+ */
 @Component
 class ChannelContinuation(
     private val transport: HttpChannelTransport,

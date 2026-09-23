@@ -25,6 +25,10 @@ class InstallDirectoryClient:
     def __init__(self, base_url: str) -> None:
         self._base_url = base_url.rstrip("/")
 
+    @property
+    def base_url(self) -> str:
+        return self._base_url
+
     def start_pairing(self) -> PairStartResult:
         with httpx.Client(timeout=10.0) as client:
             response = client.post(f"{self._base_url}/api/pair/start")

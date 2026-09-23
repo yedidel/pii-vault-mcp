@@ -5,18 +5,17 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import {
+  continuationToolText,
+  registerWithAdapter,
+  unregisterFromAdapter,
+} from "./adapter_http.js";
 
 type BridgeWakePayload = {
   requestId: string;
   workflowId: string;
   status: string;
   message: string;
-};
-
-type RegistrationResponse = {
-  sessionId: string;
-  continuationUrl: string;
-  ingressUrl: string;
 };
 
 const HOST = "127.0.0.1";
@@ -112,49 +111,6 @@ function sendJson(
   response.end(payload);
 }
 
-async function registerWithAdapter(localIngress: string): Promise<void> {
-  const response = await fetch(`${ADAPTER_BASE_URL}/continuation/register`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ingressUrl: localIngress }),
-  });
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(
-      `Adapter registration failed (${response.status}): ${body}`,
-    );
-  }
-
-  const registration = (await response.json()) as RegistrationResponse;
-  sessionId = registration.sessionId;
-  continuationUrl = registration.continuationUrl;
-  ingressUrl = registration.ingressUrl;
-
-  console.error(
-    `[bridge-wake] Registered with Adapter sessionId=${sessionId} ` +
-      `continuation=${continuationUrl}`,
-  );
-}
-
-async function unregisterFromAdapter(): Promise<void> {
-  if (!sessionId) {
-    return;
-  }
-
-  try {
-    await fetch(`${ADAPTER_BASE_URL}/continuation/${sessionId}`, {
-      method: "DELETE",
-    });
-    console.error(
-      `[bridge-wake] Unregistered from Adapter sessionId=${sessionId}`,
-    );
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error(`[bridge-wake] Unregister failed: ${message}`);
-  }
-}
-
 function listenOnPort(server: http.Server, port: number): Promise<number> {
   return new Promise((resolve, reject) => {
     const onError = (error: NodeJS.ErrnoException) => {
@@ -223,26 +179,17 @@ channelServer.setRequestHandler(CallToolRequestSchema, async (request) => {
     throw new Error(`Unknown tool: ${request.params.name}`);
   }
 
-  if (!continuationUrl || !sessionId) {
-    throw new Error(
-      "Continuation context is not ready yet. " +
-        "Wait for Adapter registration to finish.",
-    );
-  }
+  const text = continuationToolText({
+    sessionId,
+    continuationUrl,
+    ingressUrl,
+  });
 
   return {
     content: [
       {
         type: "text",
-        text: JSON.stringify(
-          {
-            sessionId,
-            continuationUrl,
-            ingressUrl,
-          },
-          null,
-          2,
-        ),
+        text,
       },
     ],
   };
@@ -358,13 +305,20 @@ console.error(
 );
 
 try {
-  await registerWithAdapter(ingressUrl);
-} catch (error: unknown) {
+  const registered = await registerWithAdapter(ingressUrl, {
+    baseUrl: ADAPTER_BASE_URL,
+    env: process.env,
+  });
+  sessionId = registered.sessionId;
+  continuationUrl = registered.continuationUrl;
+  ingressUrl = registered.ingressUrl;
   console.error(
-    `[bridge-wake] Adapter registration failed: ${
-      error instanceof Error ? error.message : String(error)
-    }`,
+    `[bridge-wake] Registered with Adapter sessionId=${sessionId} ` +
+      `continuation=${continuationUrl}`,
   );
+} catch (error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(`[bridge-wake] Adapter registration failed: ${message}`);
   console.error(
     `[bridge-wake] Falling back to direct ingress URL as continuation context: ${ingressUrl}`,
   );
@@ -373,7 +327,12 @@ try {
 
 async function shutdown(signal: string): Promise<void> {
   console.error(`[bridge-wake] Shutting down on ${signal}`);
-  await unregisterFromAdapter();
+  if (sessionId) {
+    await unregisterFromAdapter(sessionId, {
+      baseUrl: ADAPTER_BASE_URL,
+      env: process.env,
+    });
+  }
   httpServer.close();
   process.exit(0);
 }

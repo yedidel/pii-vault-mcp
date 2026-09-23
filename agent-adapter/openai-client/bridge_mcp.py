@@ -2,8 +2,9 @@
 MCP client for the local bridge-adapter HTTP server.
 
 Connects over Streamable HTTP, lists tools, and executes tool calls.
-Injects platform=openai and sessionId=<conversation.id> into send_action
-(same role as Gemini BeforeTool hooks / Claude get_continuation_context).
+Always overwrites send_action platform, sessionId, and agentId from
+trusted client runtime (never from the model). The model-facing schema
+hides those infrastructure fields.
 
 Also normalizes MCP JSON Schemas for the OpenAI Responses function-calling
 surface: free-form dict[str,str] schemas (object + additionalProperties only)
@@ -47,6 +48,30 @@ SEND_ACTION_TOP_LEVEL = {
     "sessionId",
     "platform",
 }
+
+SEND_ACTION_INFRA_FIELDS = ("agentId", "platform", "sessionId")
+
+PROVIDER_SEND_ACTION_DESCRIPTION = """
+Send an action request to the Bridge system.
+
+Call with actionType and parameters only.
+Do not ask the user for platform, sessionId, or agentId.
+Those values are supplied by the client runtime.
+
+Allowed action types:
+- PAYMENT
+- TRANSACTION
+- FILL_FORM
+
+PAYMENT parameters:
+{"amount": "100", "currency": "ILS"}
+
+FILL_FORM parameters:
+Supply only Agent-handled fields, e.g. {"name": "Test User"}.
+Do not ask the user for Vault-only email or password.
+Policy is enforced automatically; do not call evaluate_user_policy first.
+formUrl is optional.
+""".strip()
 
 # Explicit keys help Responses function-calling fill nested maps.
 SEND_ACTION_PARAMETER_PROPERTIES = {
@@ -155,10 +180,16 @@ def _enrich_send_action_schema(schema: dict[str, Any]) -> dict[str, Any]:
         }
 
     properties["parameters"] = parameters_schema
+    for key in SEND_ACTION_INFRA_FIELDS:
+        properties.pop(key, None)
     enriched["properties"] = properties
 
-    required = list(enriched.get("required") or [])
-    for key in ("agentId", "actionType", "parameters"):
+    required = [
+        key
+        for key in list(enriched.get("required") or [])
+        if key not in SEND_ACTION_INFRA_FIELDS
+    ]
+    for key in ("actionType", "parameters"):
         if key not in required:
             required.append(key)
     enriched["required"] = required
@@ -183,14 +214,16 @@ def mcp_tools_to_openai_functions(tools: list[Any]) -> list[dict[str, Any]]:
         else:
             parameters = copy.deepcopy(parameters)
 
+        description = tool.description or tool.name
         if tool.name == "send_action":
             parameters = _enrich_send_action_schema(parameters)
+            description = PROVIDER_SEND_ACTION_DESCRIPTION
 
         functions.append(
             {
                 "type": "function",
                 "name": tool.name,
-                "description": tool.description or tool.name,
+                "description": description,
                 "parameters": parameters,
             }
         )
@@ -231,6 +264,33 @@ def normalize_send_action_arguments(arguments: dict[str, Any]) -> dict[str, Any]
         args.pop(key, None)
 
     args["parameters"] = parameters
+    return args
+
+
+def trusted_agent_id(*env_keys: str) -> str:
+    for key in env_keys:
+        value = (os.getenv(key) or "").strip()
+        if value:
+            return value
+    return "agent-123"
+
+
+def inject_send_action_runtime_fields(
+        arguments: dict[str, Any],
+        *,
+        platform: str,
+        session_id: str,
+        agent_id: str,
+) -> dict[str, Any]:
+    """
+    Normalize send_action args, then overwrite infrastructure fields.
+
+    Model-supplied platform, sessionId, and agentId are discarded.
+    """
+    args = normalize_send_action_arguments(arguments)
+    args["platform"] = platform.strip()
+    args["sessionId"] = session_id.strip()
+    args["agentId"] = agent_id.strip()
     return args
 
 
@@ -314,19 +374,15 @@ class BridgeMcpClient:
 
         # Client-owned bootstrap inject — Adapter stays agnostic.
         if name == "send_action":
-            args = normalize_send_action_arguments(args)
-            args["platform"] = "openai"
-            args["sessionId"] = self.conversation_id
-
-            # Prefer a real agent id over model placeholders like "..." or blanks.
-            default_agent_id = (
-                    os.getenv("BRIDGE_AGENT_ID")
-                    or os.getenv("OPENAI_BRIDGE_AGENT_ID")
-                    or "agent-123"
-            ).strip()
-            agent_id = str(args.get("agentId") or "").strip()
-            if (not agent_id) or agent_id in {"...", "…", "string", "agentId"}:
-                args["agentId"] = default_agent_id
+            args = inject_send_action_runtime_fields(
+                args,
+                platform="openai",
+                session_id=self.conversation_id,
+                agent_id=trusted_agent_id(
+                    "BRIDGE_AGENT_ID",
+                    "OPENAI_BRIDGE_AGENT_ID",
+                ),
+            )
 
         return args
 

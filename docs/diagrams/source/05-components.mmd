@@ -1,0 +1,45 @@
+%% Component diagram — actual classes/modules
+%% Figure 7.1
+flowchart LR
+  subgraph adapter["agent-adapter"]
+    MCP["mcp_server.FastMCP"]
+    MAIN["main.py gRPC helper"]
+    WS["workflow_service.WorkflowService"]
+    CS["ContinuationService"]
+    WD["WakeDispatcher"]
+    SSE["SseClientNotifier"]
+  end
+
+  subgraph kotlin["src/main/kotlin"]
+    IMPL["BridgeServiceImpl"]
+    AS["ActionService"]
+    WIS["WorkflowInitializationService"]
+    ENG["WorkflowEngine"]
+    EXEC["WorkflowCommandExecutor"]
+    PUB["KafkaWorkflowEventPublisher"]
+    CON["WorkflowEventConsumer"]
+    GG["GuardianGatewayAdapter"]
+    VG["VaultGatewayAdapter"]
+    VWH["VaultWebSocketHandler"]
+    REG["ContinuationRegistry"]
+    WH["WebhookContinuation"]
+    REC["WorkflowRecoveryService"]
+  end
+
+  MCP --> WS
+  WS --> MAIN
+  MAIN --> IMPL
+  IMPL --> AS
+  IMPL --> WIS
+  WIS --> PUB
+  CON --> ENG
+  ENG --> EXEC
+  EXEC --> GG
+  EXEC --> VG
+  VG --> VWH
+  EXEC --> REG
+  REG --> WH
+  WH --> CS
+  CS --> WD
+  WD --> SSE
+  REC --> ENG

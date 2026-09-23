@@ -88,6 +88,10 @@ class PairingService:
             resolved = self._try_complete_pending(state.pending_pairing_code)
             if resolved is not None:
                 return resolved
+            existing = self._reuse_pending_if_valid(state.pending_pairing_code)
+            if existing is not None:
+                return existing
+            self._store.clear_pending_pairing()
 
         return self._start_pairing(
             platform=platform,
@@ -160,6 +164,37 @@ class PairingService:
             pairing_code=started.pairing_code,
             qr_url=started.qr_url,
             expires_at=started.expires_at,
+            message=(
+                "Vault app pairing required. Open qrUrl in a browser and "
+                "tap Connect Mock Vault. The agent will continue automatically "
+                "when pairing completes."
+            ),
+        )
+
+    def _reuse_pending_if_valid(self, pairing_code: str) -> PairingRequired | None:
+        assert self._directory is not None
+        try:
+            body = self._directory.get_pairing(pairing_code)
+        except Exception as error:
+            logger.warning("Pending pairing lookup failed: %s", error)
+            return None
+
+        if body.get("expired"):
+            logger.info("Pending pairing expired pairingCode=%s", pairing_code)
+            return None
+
+        status = str(body.get("status") or "").strip().upper()
+        if status != "PENDING":
+            return None
+
+        code = str(body.get("pairingCode") or pairing_code).strip()
+        expires_at = str(body.get("expiresAt") or "").strip()
+        qr_url = f"{self._directory.base_url}/pair?code={code}"
+        logger.info("Reusing pending pairing pairingCode=%s", code)
+        return PairingRequired(
+            pairing_code=code,
+            qr_url=qr_url,
+            expires_at=expires_at,
             message=(
                 "Vault app pairing required. Open qrUrl in a browser and "
                 "tap Connect Mock Vault. The agent will continue automatically "

@@ -40,6 +40,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
     implementation("org.json:json:20231013")
     implementation("org.springframework.boot:spring-boot-starter-web")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
 }
 protobuf {
     protoc {
@@ -83,4 +84,8 @@ tasks.named("ktlintMainSourceSetCheck") {
 }
 application {
     mainClass.set("bridge.GrpcServerKt")
+}
+
+tasks.test {
+    useJUnitPlatform()
 }

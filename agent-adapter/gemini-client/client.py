@@ -16,7 +16,10 @@ Parallel to openai-client:
 
 from __future__ import annotations
 from dotenv import load_dotenv
+from pathlib import Path
+
 load_dotenv()
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 import argparse
 import asyncio
@@ -48,37 +51,31 @@ SSE_CONNECT_TIMEOUT_SECONDS = float(
 SYSTEM_INSTRUCTIONS = """
 You are a Bridge-enabled Gemini agent.
 
-You have access to bridge-adapter MCP tools, including send_action and
-get_action_status.
+You have access to bridge-adapter MCP tools, including send_action,
+evaluate_user_policy, store_pii, and get_action_status.
 
 When the user asks you to start a Bridge workflow (payment, transaction,
-or form fill), call send_action.
+or form fill), call send_action with actionType and parameters only.
+Do not ask the user for platform, sessionId, or agentId.
+Do not call evaluate_user_policy unless the user asks what their
+privacy policy is.
 
 Rules for send_action:
-- Always use platform=\"gemini\".
-- Always pass sessionId as the current Gemini interaction.id provided below.
 - Always put action data under the nested object \"parameters\".
   Never leave parameters as {}.
   Never place amount/currency/id/name at the top level of the tool call.
 - PAYMENT example:
   {
-    \"agentId\": \"default\",
     \"actionType\": \"PAYMENT\",
-    \"parameters\": {\"amount\": \"100\", \"currency\": \"ILS\"},
-    \"sessionId\": \"<interaction.id>\",
-    \"platform\": \"gemini\"
+    \"parameters\": {\"amount\": \"100\", \"currency\": \"ILS\"}
   }
-- FILL_FORM example:
+- FILL_FORM: send only Agent-handled values (often just name).
+  Do not ask the user for Vault-only fields such as email or password.
+  Do not call evaluate_user_policy first; the Adapter enforces policy.
+  Example:
   {
-    \"agentId\": \"agent-123\",
     \"actionType\": \"FILL_FORM\",
-    \"parameters\": {
-      \"name\": \"Dana\",
-      \"email\": \"dana@example.com\",
-      \"password\": \"Secret123\"
-    },
-    \"sessionId\": \"<interaction.id>\",
-    \"platform\": \"gemini\"
+    \"parameters\": {\"name\": \"Test User\"}
   }
   formUrl is optional; Mock Vault submits to the demo HTML form.
 
@@ -170,14 +167,17 @@ async def _continue_tool_calls(
         interaction = genai_client.interactions.create(
             model=model,
             previous_interaction_id=tip_id,
-            system_instruction=SYSTEM_INSTRUCTIONS
-            + f"\n\nCurrent interaction.id (use as send_action sessionId): "
-            + tip_id,
+            system_instruction=SYSTEM_INSTRUCTIONS,
             input=tool_outputs,
             tools=tools,
         )
         tip_id = (interaction.id or tip_id).strip()
         bridge.set_interaction_id(tip_id)
+
+        # Do not keep polling get_action_status. The Adapter GeminiProvider
+        # wake is the authoritative next turn after vault completion.
+        if send_action_session_id:
+            return interaction, tip_id, send_action_session_id
 
     print(
         f"warning> stopped after {MAX_TOOL_TURNS} tool turns without a final answer",
@@ -209,9 +209,7 @@ async def _run_tool_loop(
     interaction = genai_client.interactions.create(
         model=model,
         previous_interaction_id=tip_id,
-        system_instruction=SYSTEM_INSTRUCTIONS
-        + f"\n\nCurrent interaction.id (use as send_action sessionId): "
-        + tip_id,
+        system_instruction=SYSTEM_INSTRUCTIONS,
         input=user_input,
         tools=tools,
     )
@@ -392,12 +390,6 @@ async def chat_loop(
             event_type = str(payload.get("type") or "workflow.updated").strip()
 
             resume_session_id = str(payload.get("resumeSessionId") or "").strip()
-            if not resume_session_id:
-                print(
-                    f"error> {event_type} missing resumeSessionId",
-                    file=sys.stderr,
-                )
-                return
 
             if event_type == "vault.paired":
                 print(
@@ -408,6 +400,14 @@ async def chat_loop(
                     f"\nworkflow> status={payload.get('status')} "
                     f"requestId={payload.get('requestId')}"
                 )
+
+            if not resume_session_id:
+                print(
+                    f"error> {event_type} missing resumeSessionId; "
+                    "Gemini wake did not produce a successor interaction",
+                    file=sys.stderr,
+                )
+                return
 
             try:
                 interaction = await asyncio.to_thread(
@@ -518,6 +518,9 @@ async def chat_loop(
                         if events.session_id != awaiting_wake_session_id:
                             await events.start(awaiting_wake_session_id)
                         bridge.set_interaction_id(awaiting_wake_session_id)
+                    elif interaction_id != current_id:
+                        # SSE already advanced to the Gemini wake successor.
+                        pass
                     else:
                         interaction_id = tip_id
                         save_interaction_id(interaction_id)

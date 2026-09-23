@@ -66,6 +66,7 @@ class WorkflowEntity(
     @Column(name = "completed_at")
     var completedAt: LocalDateTime? = null,
 
+    // Unused by the live workflow. Kept for schema compatibility.
     @Column(name = "last_executed_command")
     var lastExecutedCommand: String? = null,
 

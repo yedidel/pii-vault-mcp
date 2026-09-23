@@ -22,7 +22,6 @@ class WorkflowRecoveryService(
                     WorkflowState.RECEIVED,
                     WorkflowState.WAITING_FOR_GUARDIAN,
                     WorkflowState.WAITING_FOR_VAULT_RESPONSE,
-                    WorkflowState.IN_PROGRESS
                 )
             )
 

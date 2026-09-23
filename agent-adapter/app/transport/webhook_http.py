@@ -1,3 +1,4 @@
+import asyncio
 import json
 from starlette.requests import Request
 from transport.webhook_signature import verify_webhook_signature
@@ -25,7 +26,7 @@ async def handle_bridge_webhook_request(
     except (json.JSONDecodeError, TypeError, ValueError):
         return {"detail": "Invalid webhook JSON body"}, 400
 
-    return process_bridge_webhook(notification)
+    return await asyncio.to_thread(process_bridge_webhook, notification)
 
 
 def process_bridge_webhook(

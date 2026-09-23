@@ -36,33 +36,67 @@ class WakeDispatcher:
         # Providers like Gemini may rotate continuationContext during wake.
         route_session_id = (workflow.continuationContext or "").strip()
 
-        # Only notify after a successful platform wake.
-        provider.wake(
-            workflow,
-            notification,
-        )
+        # Publish workflow.updated before the provider API call so POLLING
+        # (and WEBHOOK) SSE is not blocked by Gemini/OpenAI retries.
+        if route_session_id:
+            self._notify_client(
+                workflow=workflow,
+                notification=notification,
+                session_id=route_session_id,
+                resume_session_id=None,
+            )
 
-        if not route_session_id:
-            return
+        wake_error: Exception | None = None
+        try:
+            provider.wake(
+                workflow,
+                notification,
+            )
+        except Exception as error:
+            wake_error = error
+            logger.exception(
+                "Provider wake failed platform=%s requestId=%s",
+                platform,
+                notification.requestId,
+            )
 
         resume_session_id = (workflow.continuationContext or "").strip()
-        resume: str | None = None
-        if resume_session_id and resume_session_id != route_session_id:
-            resume = resume_session_id
+        if (
+                route_session_id
+                and resume_session_id
+                and resume_session_id != route_session_id
+        ):
+            self._notify_client(
+                workflow=workflow,
+                notification=notification,
+                session_id=route_session_id,
+                resume_session_id=resume_session_id,
+            )
 
+        if wake_error is not None:
+            raise wake_error
+
+    def _notify_client(
+            self,
+            *,
+            workflow: WorkflowModel,
+            notification: ContinuationNotification,
+            session_id: str,
+            resume_session_id: str | None,
+    ) -> None:
         self.client_notifier.notify(
             ClientNotifyEvent(
                 workflowId=workflow.workflowId,
                 requestId=workflow.requestId or notification.requestId,
                 platform=workflow.platform,
-                sessionId=route_session_id,
+                sessionId=session_id,
                 status=notification.status,
-                resumeSessionId=resume,
+                resumeSessionId=resume_session_id,
             )
         )
         logger.debug(
             "Notified client platform=%s sessionId=%s resumeSessionId=%s",
             workflow.platform,
-            route_session_id,
-            resume,
+            session_id,
+            resume_session_id,
         )

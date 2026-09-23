@@ -3,10 +3,11 @@ from fastapi.responses import JSONResponse
 import json
 from pathlib import Path
 
-from workflow import models
+from mcp_server import pii_vault_store
 from transport.client_events_http import handle_client_events
 from transport.sessions_http import handle_session_register
-from transport.webhook_http import process_bridge_webhook
+from transport.vault_resolve_http import handle_vault_resolve_request
+from transport.webhook_http import handle_bridge_webhook_request
 from workflow.workflow_context import (
     bridge_session_registry,
     client_notifier,
@@ -14,7 +15,7 @@ from workflow.workflow_context import (
 )
 
 # FastAPI app used in MCP_TRANSPORT=stdio
-# Exposes Continuation Transport (Bridge webhook) + client SSE events.
+# Continuation Transport (Bridge webhook) + client SSE + localhost vault resolve.
 app = FastAPI()
 
 with open(Path(__file__).resolve().parent / "vault_config.json", encoding="utf-8") as config_file:
@@ -27,11 +28,15 @@ async def root():
 
 
 @app.post("/webhook/bridge")
-async def bridge_webhook(
-        notification: models.ContinuationNotification,
-):
-    body, status_code = process_bridge_webhook(notification)
+async def bridge_webhook(request: Request):
+    body, status_code = await handle_bridge_webhook_request(request)
     return JSONResponse(content=body, status_code=status_code)
+
+
+@app.post("/vault/resolve")
+async def vault_resolve(request: Request):
+    response = await handle_vault_resolve_request(request, pii_vault_store)
+    return response
 
 
 @app.get("/events")

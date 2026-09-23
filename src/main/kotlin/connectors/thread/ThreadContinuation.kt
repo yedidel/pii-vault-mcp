@@ -6,6 +6,9 @@ import continuation.ContinuationRequest
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 
+/**
+ * Prototype stub. THREAD continuation is not implemented.
+ */
 @Component
 class ThreadContinuation : ContinuationConnector {
 
@@ -18,13 +21,9 @@ class ThreadContinuation : ContinuationConnector {
     override fun continueWorkflow(
         request: ContinuationRequest,
     ) {
-
-        logger.info(
-            "thread continuation requested. requestId={}",
+        logger.warn(
+            "THREAD connector is not implemented. requestId={}",
             request.requestId,
         )
-
-        // todo:
-        // resume the existing conversation thread
     }
 }

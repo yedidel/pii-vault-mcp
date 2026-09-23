@@ -29,11 +29,6 @@ class WorkflowTransitionValidator {
                         nextState == WorkflowState.FAILED
 
             WorkflowState.WAITING_FOR_VAULT_RESPONSE ->
-                nextState == WorkflowState.IN_PROGRESS ||
-                        nextState == WorkflowState.COMPLETED ||
-                        nextState == WorkflowState.FAILED
-
-            WorkflowState.IN_PROGRESS ->
                 nextState == WorkflowState.COMPLETED ||
                         nextState == WorkflowState.FAILED
 
@@ -67,9 +62,12 @@ class WorkflowTransitionValidator {
             WorkflowEventType.ACTION_RESPONSE_RECEIVED ->
                 currentState == WorkflowState.WAITING_FOR_VAULT_RESPONSE
 
+            // Not published by the live workflow. Terminal work (including
+            // NotifyAgent) happens on ACTION_RESPONSE_RECEIVED / GUARDIAN_REJECTED.
+            // Ignore leftover Kafka payloads of these types in any state.
             WorkflowEventType.WORKFLOW_COMPLETED,
             WorkflowEventType.WORKFLOW_FAILED ->
-                currentState == WorkflowState.IN_PROGRESS
+                false
         }
     }
 }

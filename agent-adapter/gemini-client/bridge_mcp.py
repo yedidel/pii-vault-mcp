@@ -1,8 +1,8 @@
 """
 MCP client for the local bridge-adapter HTTP server (Gemini).
 
-Injects platform=gemini and sessionId=<interaction.id> into send_action.
-Maps MCP tools to Gemini Interactions function tools.
+Always overwrites send_action platform, sessionId, and agentId from
+trusted runtime. Maps MCP tools to Gemini Interactions function tools.
 """
 
 from __future__ import annotations
@@ -31,6 +31,9 @@ _SPEC.loader.exec_module(_HELPERS)
 
 normalize_send_action_arguments = _HELPERS.normalize_send_action_arguments
 _enrich_send_action_schema = _HELPERS._enrich_send_action_schema
+inject_send_action_runtime_fields = _HELPERS.inject_send_action_runtime_fields
+trusted_agent_id = _HELPERS.trusted_agent_id
+PROVIDER_SEND_ACTION_DESCRIPTION = _HELPERS.PROVIDER_SEND_ACTION_DESCRIPTION
 get_auth_headers = _HELPERS.get_auth_headers
 
 DEFAULT_MCP_URL = os.getenv(
@@ -74,14 +77,16 @@ def mcp_tools_to_gemini_functions(tools: list[Any]) -> list[dict[str, Any]]:
         else:
             parameters = copy.deepcopy(parameters)
 
+        description = tool.description or tool.name
         if tool.name == "send_action":
             parameters = _enrich_send_action_schema(parameters)
+            description = PROVIDER_SEND_ACTION_DESCRIPTION
 
         functions.append(
             {
                 "type": "function",
                 "name": tool.name,
-                "description": tool.description or tool.name,
+                "description": description,
                 "parameters": parameters,
             }
         )
@@ -172,18 +177,15 @@ class BridgeMcpClient:
         args = dict(arguments or {})
 
         if name == "send_action":
-            args = normalize_send_action_arguments(args)
-            args["platform"] = "gemini"
-            args["sessionId"] = self.interaction_id
-
-            default_agent_id = (
-                    os.getenv("BRIDGE_AGENT_ID")
-                    or os.getenv("GEMINI_BRIDGE_AGENT_ID")
-                    or "agent-123"
-            ).strip()
-            agent_id = str(args.get("agentId") or "").strip()
-            if (not agent_id) or agent_id in {"...", "…", "string", "agentId"}:
-                args["agentId"] = default_agent_id
+            args = inject_send_action_runtime_fields(
+                args,
+                platform="gemini",
+                session_id=self.interaction_id,
+                agent_id=trusted_agent_id(
+                    "BRIDGE_AGENT_ID",
+                    "GEMINI_BRIDGE_AGENT_ID",
+                ),
+            )
 
         return args
 
