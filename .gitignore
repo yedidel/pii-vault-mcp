@@ -1,25 +1,53 @@
-.gradle
+# Gradle / Kotlin / Java
+.gradle/
 build/
-!gradle/wrapper/gradle-wrapper.jar
-!**/src/main/**/build/
-!**/src/test/**/build/
-.env
-### IntelliJ IDEA ###
-.idea/modules.xml
-.idea/jarRepositories.xml
-.idea/compiler.xml
-.idea/libraries/
-*.iws
-*.iml
-*.ipr
 out/
-!**/src/main/**/out/
-!**/src/test/**/out/
-
-### Kotlin ###
 .kotlin
+!gradle/wrapper/gradle-wrapper.jar
 
-### Eclipse ###
+# Python
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+pip-wheel-metadata/
+
+# Node
+node_modules/
+dist/
+coverage/
+*.log
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
+# Local runtime state (pairing, encrypted PII store, install directory DB)
+agent-adapter/app/data/
+install-directory/data/
+
+# IDE / OS / local assistant settings
+.idea/
+.vscode/
+.claude/
+.gemini/
+.DS_Store
+*.iml
+*.iws
+*.ipr
+
+# Local report drafts. Kept on disk, not part of the source tree.
+/docs/
+
+# Eclipse / NetBeans leftovers
 .apt_generated
 .classpath
 .factorypath
@@ -28,54 +56,7 @@ out/
 .springBeans
 .sts4-cache
 bin/
-!**/src/main/**/bin/
-!**/src/test/**/bin/
-
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
-
-### VS Code ###
-.vscode/
-
-### Mac OS ###
-.DS_Store
-
-### Python ###
-.venv/
-venv/
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-env/
-pip-wheel-metadata/
-*.egg-info/
-dist/
-build/
-
-### Python IDE ###
-.idea/
-.vscode/
-.mcp.json
-# Claude channel & Node dependencies
-**/node_modules/
-**/build/
-### macOS Python cache ###
-.DS_Store
-.idea/
-*.iml
-# Local IDE MCP settings (do not delete working copies)
-.claude/
-.gemini/
-# Gemini POC runner recreates these logs
-agent-adapter/gemini-bridge-hooks/.poc-*.log
-# gRPC generated files (Python)
-agent-adapter/app/bridge_pb2.py
-agent-adapter/app/bridge_pb2_grpc.py
-agent-adapter/app/data/
-install-directory/data/
+nbproject/private/
+nbbuild/
+nbdist/
+.nb-gradle/
